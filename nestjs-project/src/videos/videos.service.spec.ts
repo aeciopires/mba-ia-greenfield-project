@@ -1,8 +1,11 @@
-import { Video, VideoStatus } from './entities/video.entity';
+import { Video, VideoStatus, VideoVisibility } from './entities/video.entity';
 import { VideosService } from './videos.service';
 import {
+  CategoryNotFoundException,
+  VideoAlreadyPublishedException,
   VideoNotFoundException,
   VideoNotInDraftStatusException,
+  VideoNotReadyException,
 } from '../common/exceptions/domain.exception';
 import { VIDEO_PROCESSING_QUEUE } from '../queue/queue.constants';
 
@@ -15,21 +18,63 @@ function makeVideo(overrides: Partial<Video> = {}): Video {
   const v = new Video();
   v.id = 'video-uuid';
   v.channel_id = 'channel-uuid';
+  v.category_id = null;
   v.title = 'My Video';
   v.description = null;
   v.status = VideoStatus.DRAFT;
+  v.visibility = VideoVisibility.PUBLIC;
   v.storage_key = 'channels/channel-uuid/videos/test-slug/original.mp4';
   v.thumbnail_key = null;
   v.duration = null;
   v.metadata = null;
   v.slug = 'test-slug';
   v.error_message = null;
+  v.view_count = 0;
+  v.likes_count = 0;
+  v.dislikes_count = 0;
+  v.comments_count = 0;
+  v.published_at = null;
   v.created_at = new Date();
   v.updated_at = new Date();
   return Object.assign(v, overrides);
 }
 
+function makeQueryBuilder(overrides: Record<string, jest.Mock> = {}) {
+  const qb: Record<string, jest.Mock> = {
+    leftJoinAndSelect: jest.fn(),
+    where: jest.fn(),
+    andWhere: jest.fn(),
+    orderBy: jest.fn(),
+    addOrderBy: jest.fn(),
+    skip: jest.fn(),
+    take: jest.fn(),
+    getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+    update: jest.fn(),
+    set: jest.fn(),
+    execute: jest.fn().mockResolvedValue(undefined),
+    getMany: jest.fn().mockResolvedValue([]),
+    ...overrides,
+  };
+  // make all chainable methods return qb itself
+  const chainable = [
+    'leftJoinAndSelect',
+    'where',
+    'andWhere',
+    'orderBy',
+    'addOrderBy',
+    'skip',
+    'take',
+    'update',
+    'set',
+  ];
+  for (const m of chainable) {
+    if (!overrides[m]) qb[m].mockReturnValue(qb);
+  }
+  return qb;
+}
+
 function makeRepo(overrides: Record<string, jest.Mock> = {}): any {
+  const qb = makeQueryBuilder();
   return {
     create: jest
       .fn()
@@ -38,6 +83,8 @@ function makeRepo(overrides: Record<string, jest.Mock> = {}): any {
     findOne: jest.fn(),
     findAndCount: jest.fn(),
     remove: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue(qb),
+    _qb: qb,
     ...overrides,
   };
 }
@@ -51,6 +98,13 @@ function makeStorageService(): any {
       .fn()
       .mockResolvedValue(PRESIGNED_DOWNLOAD_URL),
     deleteObject: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+function makeCategoriesService(): any {
+  return {
+    findById: jest.fn(),
+    findAll: jest.fn().mockResolvedValue([]),
   };
 }
 
@@ -72,6 +126,7 @@ const mockConfig = {
 describe('VideosService', () => {
   let repo: ReturnType<typeof makeRepo>;
   let storageService: ReturnType<typeof makeStorageService>;
+  let categoriesService: ReturnType<typeof makeCategoriesService>;
   let queue: ReturnType<typeof makeQueue>;
   let service: VideosService;
 
@@ -79,8 +134,15 @@ describe('VideosService', () => {
     jest.clearAllMocks();
     repo = makeRepo();
     storageService = makeStorageService();
+    categoriesService = makeCategoriesService();
     queue = makeQueue();
-    service = new VideosService(repo, storageService, queue, mockConfig);
+    service = new VideosService(
+      repo,
+      storageService,
+      categoriesService,
+      queue,
+      mockConfig,
+    );
   });
 
   describe('initiateUpload', () => {
@@ -164,22 +226,85 @@ describe('VideosService', () => {
     });
   });
 
+  describe('updateVideo', () => {
+    it('updates title and description', async () => {
+      const video = makeVideo({ status: VideoStatus.DRAFT });
+      repo.findOne.mockResolvedValue(video);
+      repo.save.mockResolvedValue({ ...video, title: 'New Title' });
+
+      const result = await service.updateVideo('video-uuid', 'channel-uuid', {
+        title: 'New Title',
+      });
+      expect(result.title).toBe('New Title');
+      expect(repo.save).toHaveBeenCalled();
+    });
+
+    it('throws VideoNotFoundException when video not found', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(
+        service.updateVideo('missing', 'channel-uuid', {}),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+
+    it('throws CategoryNotFoundException when category_id does not exist', async () => {
+      const video = makeVideo();
+      repo.findOne.mockResolvedValue(video);
+      categoriesService.findById.mockResolvedValue(null);
+
+      await expect(
+        service.updateVideo('video-uuid', 'channel-uuid', {
+          category_id: 'bad-cat-id',
+        }),
+      ).rejects.toBeInstanceOf(CategoryNotFoundException);
+    });
+  });
+
+  describe('publishVideo', () => {
+    it('sets published_at when video is ready and not yet published', async () => {
+      const video = makeVideo({
+        status: VideoStatus.READY,
+        published_at: null,
+      });
+      repo.findOne.mockResolvedValue(video);
+      repo.save.mockImplementation((v: Video) => Promise.resolve(v));
+
+      const result = await service.publishVideo('video-uuid', 'channel-uuid');
+      expect(result.published_at).toBeInstanceOf(Date);
+    });
+
+    it('throws VideoNotReadyException when video is not ready', async () => {
+      const video = makeVideo({
+        status: VideoStatus.PROCESSING,
+        published_at: null,
+      });
+      repo.findOne.mockResolvedValue(video);
+      await expect(
+        service.publishVideo('video-uuid', 'channel-uuid'),
+      ).rejects.toBeInstanceOf(VideoNotReadyException);
+    });
+
+    it('throws VideoAlreadyPublishedException when already published', async () => {
+      const video = makeVideo({
+        status: VideoStatus.READY,
+        published_at: new Date(),
+      });
+      repo.findOne.mockResolvedValue(video);
+      await expect(
+        service.publishVideo('video-uuid', 'channel-uuid'),
+      ).rejects.toBeInstanceOf(VideoAlreadyPublishedException);
+    });
+  });
+
   describe('findAll', () => {
-    it('returns paginated data for READY videos', async () => {
-      const videos = [makeVideo({ status: VideoStatus.READY })];
-      repo.findAndCount.mockResolvedValue([videos, 1]);
+    it('returns paginated data via query builder', async () => {
+      const video = makeVideo({ status: VideoStatus.READY });
+      repo._qb.getManyAndCount.mockResolvedValue([[video], 1]);
 
       const result = await service.findAll({ page: 1, limit: 20 });
 
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
-      expect(repo.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { status: VideoStatus.READY },
-          skip: 0,
-          take: 20,
-        }),
-      );
+      expect(repo.createQueryBuilder).toHaveBeenCalled();
     });
   });
 
@@ -191,9 +316,11 @@ describe('VideosService', () => {
       const result = await service.findBySlug('test-slug');
 
       expect(result).toBe(video);
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { slug: 'test-slug', status: VideoStatus.READY },
-      });
+      expect(repo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { slug: 'test-slug', status: VideoStatus.READY },
+        }),
+      );
     });
 
     it('throws VideoNotFoundException when video is not found', async () => {
@@ -201,6 +328,14 @@ describe('VideosService', () => {
       await expect(service.findBySlug('missing')).rejects.toBeInstanceOf(
         VideoNotFoundException,
       );
+    });
+  });
+
+  describe('incrementViewCount', () => {
+    it('executes an atomic counter update', async () => {
+      await service.incrementViewCount('test-slug');
+      expect(repo.createQueryBuilder).toHaveBeenCalled();
+      expect(repo._qb.execute).toHaveBeenCalled();
     });
   });
 

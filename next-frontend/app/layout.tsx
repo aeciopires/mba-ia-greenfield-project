@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 
 import { SessionProvider } from "@/components/auth/session-provider";
+import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -43,7 +44,8 @@ export default async function RootLayout({
             isLoggedIn: session.isLoggedIn ?? false,
           }}
         >
-          {children}
+          <Header />
+          <main className="flex-1">{children}</main>
         </SessionProvider>
       </body>
     </html>

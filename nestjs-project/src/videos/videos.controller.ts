@@ -28,6 +28,7 @@ import { ChannelsService } from '../channels/channels.service';
 import { VideosService } from './videos.service';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { QueryVideosDto } from './dto/query-videos.dto';
+import { UpdateVideoDto } from './dto/update-video.dto';
 
 @ApiTags('videos')
 @Controller('videos')
@@ -64,18 +65,16 @@ export class VideosController {
     @Body() dto: CreateVideoDto,
   ) {
     const channel = await this.channelsService.findByUserId(user.sub);
-    if (!channel) {
-      throw new NotFoundException('Channel not found for user');
-    }
+    if (!channel) throw new NotFoundException('Channel not found for user');
     return this.videosService.initiateUpload(channel.id, dto);
   }
 
   @Patch(':id/start-processing')
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: 'Notify upload complete and start processing',
+    summary: 'Start video processing',
     description:
-      'Transitions the video from draft to processing and enqueues the FFmpeg job.',
+      'Transitions video from draft to processing and enqueues the FFmpeg job.',
   })
   @ApiResponse({
     status: 200,
@@ -89,12 +88,12 @@ export class VideosController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Video not found or not owned by the authenticated user',
+    description: 'Video not found',
     schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
   })
   @ApiResponse({
     status: 409,
-    description: 'Video is not in draft status',
+    description: 'Video not in draft status',
     schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
   })
   async startProcessing(
@@ -102,17 +101,113 @@ export class VideosController {
     @Param('id') id: string,
   ) {
     const channel = await this.channelsService.findByUserId(user.sub);
-    if (!channel) {
-      throw new NotFoundException('Channel not found for user');
-    }
+    if (!channel) throw new NotFoundException('Channel not found for user');
     return this.videosService.startProcessing(id, channel.id);
+  }
+
+  @Patch(':id')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Update video metadata',
+    description:
+      'Updates title, description, category, or visibility of a video.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Video updated',
+    schema: { type: 'object' },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async updateVideo(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: UpdateVideoDto,
+  ) {
+    const channel = await this.channelsService.findByUserId(user.sub);
+    if (!channel) throw new NotFoundException('Channel not found for user');
+    return this.videosService.updateVideo(id, channel.id, dto);
+  }
+
+  @Post(':id/thumbnail')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Get thumbnail upload URL',
+    description: 'Returns a presigned URL to upload a custom thumbnail image.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned thumbnail upload URL',
+    schema: {
+      properties: { thumbnail_upload_url: { type: 'string', format: 'uri' } },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async getThumbnailUploadUrl(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    const channel = await this.channelsService.findByUserId(user.sub);
+    if (!channel) throw new NotFoundException('Channel not found for user');
+    return this.videosService.getThumbnailUploadUrl(id, channel.id);
+  }
+
+  @Patch(':id/publish')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Publish video',
+    description:
+      'Marks video as published by setting published_at timestamp. Video must be in ready status.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Video published',
+    schema: { type: 'object' },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Video not ready or already published',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async publishVideo(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    const channel = await this.channelsService.findByUserId(user.sub);
+    if (!channel) throw new NotFoundException('Channel not found for user');
+    return this.videosService.publishVideo(id, channel.id);
   }
 
   @Public()
   @Get()
   @ApiOperation({
-    summary: 'List ready videos',
-    description: 'Returns a paginated list of videos with status=ready.',
+    summary: 'List public ready videos',
+    description:
+      'Returns a paginated list of public videos with status=ready. Supports search (q), category, and channel filters.',
   })
   @ApiResponse({
     status: 200,
@@ -128,19 +223,31 @@ export class VideosController {
   })
   async findAll(@Query() query: QueryVideosDto) {
     const { data, total } = await this.videosService.findAll(query);
-    return {
-      data,
-      total,
-      page: query.page ?? 1,
-      limit: query.limit ?? 20,
-    };
+    return { data, total, page: query.page ?? 1, limit: query.limit ?? 20 };
+  }
+
+  @Public()
+  @Get(':slug/suggestions')
+  @ApiOperation({
+    summary: 'Get video suggestions',
+    description:
+      'Returns up to 10 suggested videos from the same category, ordered by view count.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of suggested videos',
+    schema: { type: 'array', items: { type: 'object' } },
+  })
+  async getSuggestions(@Param('slug') slug: string) {
+    return this.videosService.getSuggestions(slug);
   }
 
   @Public()
   @Get(':slug')
   @ApiOperation({
     summary: 'Get video by slug',
-    description: 'Returns a ready video by its unique slug.',
+    description:
+      'Returns a ready video by its unique slug. Works for both public and unlisted videos.',
   })
   @ApiResponse({
     status: 200,
@@ -149,11 +256,23 @@ export class VideosController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Video not found or not ready',
+    description: 'Video not found',
     schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
   })
   async findBySlug(@Param('slug') slug: string) {
     return this.videosService.findBySlug(slug);
+  }
+
+  @Public()
+  @Post(':slug/views')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Increment view count',
+    description: 'Atomically increments the view count for a ready video.',
+  })
+  @ApiResponse({ status: 204, description: 'View count incremented' })
+  async incrementViewCount(@Param('slug') slug: string): Promise<void> {
+    await this.videosService.incrementViewCount(slug);
   }
 
   @Public()
@@ -163,13 +282,10 @@ export class VideosController {
     description:
       'Redirects to a presigned MinIO URL for streaming (supports HTTP Range requests natively).',
   })
-  @ApiResponse({
-    status: 302,
-    description: 'Redirect to presigned stream URL',
-  })
+  @ApiResponse({ status: 302, description: 'Redirect to presigned stream URL' })
   @ApiResponse({
     status: 404,
-    description: 'Video not found or not ready',
+    description: 'Video not found',
     schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
   })
   async streamVideo(
@@ -193,7 +309,7 @@ export class VideosController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Video not found or not ready',
+    description: 'Video not found',
     schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
   })
   async downloadVideo(
@@ -209,8 +325,7 @@ export class VideosController {
   @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Delete video',
-    description:
-      'Deletes a video and its associated storage objects (video file and thumbnail).',
+    description: 'Deletes a video and its associated storage objects.',
   })
   @ApiResponse({ status: 204, description: 'Video deleted' })
   @ApiResponse({
@@ -220,7 +335,7 @@ export class VideosController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Video not found or not owned by the authenticated user',
+    description: 'Video not found',
     schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
   })
   async deleteVideo(
@@ -228,9 +343,7 @@ export class VideosController {
     @Param('id') id: string,
   ): Promise<void> {
     const channel = await this.channelsService.findByUserId(user.sub);
-    if (!channel) {
-      throw new NotFoundException('Channel not found for user');
-    }
+    if (!channel) throw new NotFoundException('Channel not found for user');
     await this.videosService.delete(id, channel.id);
   }
 }

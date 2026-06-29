@@ -8,6 +8,10 @@ import { DataSource, Repository } from 'typeorm';
 import appConfig from '../config/app.config';
 import authConfig from '../config/auth.config';
 import mailConfig from '../config/mail.config';
+import queueConfig from '../config/queue.config';
+import storageConfig from '../config/storage.config';
+import { getQueueToken } from '@nestjs/bullmq';
+import { VIDEO_PROCESSING_QUEUE } from '../queue/queue.constants';
 import * as argon2 from 'argon2';
 import {
   EmailAlreadyExistsException,
@@ -40,7 +44,7 @@ async function createAuthTestModule(): Promise<TestingModule> {
     imports: [
       ConfigModule.forRoot({
         isGlobal: true,
-        load: [appConfig, authConfig, mailConfig],
+        load: [appConfig, authConfig, mailConfig, queueConfig, storageConfig],
       }),
       TypeOrmModule.forRoot(ds.options),
       TypeOrmModule.forFeature([
@@ -60,7 +64,10 @@ async function createAuthTestModule(): Promise<TestingModule> {
       MailModule,
     ],
     providers: [AuthService],
-  }).compile();
+  })
+    .overrideProvider(getQueueToken(VIDEO_PROCESSING_QUEUE))
+    .useValue({ add: jest.fn(), close: jest.fn() })
+    .compile();
 }
 
 function captureConfirmationToken(authService: AuthService): Promise<string> {

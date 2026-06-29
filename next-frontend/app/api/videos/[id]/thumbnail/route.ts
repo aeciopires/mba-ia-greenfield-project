@@ -1,0 +1,22 @@
+import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/lib/env";
+import { getSession } from "@/lib/auth/session";
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function POST(
+  _request: NextRequest,
+  { params }: Params,
+): Promise<NextResponse<{ thumbnail_upload_url: string }>> {
+  const { id } = await params;
+  const session = await getSession();
+  if (!session.accessToken) {
+    return NextResponse.json({ error: "Unauthorized" } as never, { status: 401 });
+  }
+  const res = await fetch(`${env.API_URL}/videos/${id}/thumbnail`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.accessToken}` },
+  });
+  const data = (await res.json()) as { thumbnail_upload_url: string };
+  return NextResponse.json(data, { status: res.status });
+}

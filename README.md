@@ -24,10 +24,15 @@
     - [7. Consultar vídeo processado](#7-consultar-vídeo-processado)
     - [8. Assistir / Baixar](#8-assistir--baixar)
     - [9. Remover vídeo](#9-remover-vídeo)
+  - [Makefile — Atalhos de Desenvolvimento](#makefile--atalhos-de-desenvolvimento)
   - [Funcionalidades Implementadas](#funcionalidades-implementadas)
     - [Fase 01 — Configuração Base](#fase-01--configuração-base)
     - [Fase 02 — Autenticação](#fase-02--autenticação)
     - [Fase 03 — Upload e Processamento de Vídeos ✅](#fase-03--upload-e-processamento-de-vídeos-)
+    - [Fase 04 — Gerenciamento de Vídeos e Canal ✅](#fase-04--gerenciamento-de-vídeos-e-canal-)
+    - [Fase 05 — Página de Visualização do Vídeo ✅](#fase-05--página-de-visualização-do-vídeo-)
+    - [Fase 06 — Interações Sociais ✅](#fase-06--interações-sociais-)
+    - [Fase 07 — Página Inicial, Busca e Finalização ✅](#fase-07--página-inicial-busca-e-finalização-)
   - [Estrutura do Projeto](#estrutura-do-projeto)
   - [Fases do Projeto](#fases-do-projeto)
   - [Stack Tecnológica](#stack-tecnológica)
@@ -116,6 +121,8 @@ graph TB
 O diagrama de arquitetura completo (C4) está em [docs/diagrams/software-arch.mermaid](docs/diagrams/software-arch.mermaid).
 
 ## Como Rodar
+
+> **Atalho:** use `make help` para ver todos os comandos disponíveis via Makefile na raiz do projeto.
 
 Os dois subprojetos têm stacks Docker **separadas**. O backend deve estar rodando antes do frontend.
 
@@ -248,6 +255,29 @@ sequenceDiagram
     A->>DB: Valida hash + família (detecta reuso por família)
     A->>DB: Revoga token antigo, INSERT novo
     A-->>U: Novo par { access_token, refresh_token }
+```
+
+## Makefile — Atalhos de Desenvolvimento
+
+O arquivo `Makefile` na raiz do projeto oferece atalhos para as tarefas mais comuns:
+
+```bash
+make help            # lista todos os comandos disponíveis
+
+make up              # sobe todos os containers (backend + frontend)
+make down            # derruba todos os containers
+make install         # instala dependências em todos os containers
+
+make test            # roda todos os testes (backend + E2E + frontend)
+make test-backend    # testes unitários e de integração do NestJS
+make test-e2e        # testes E2E do NestJS (supertest)
+make test-frontend   # testes Vitest do Next.js
+
+make lint            # lint em ambos os subprojetos
+make typecheck       # type-check TypeScript em ambos
+
+make migrate         # executa migrações pendentes do banco
+make seed            # insere dados de exemplo no banco
 ```
 
 ## Testes
@@ -444,6 +474,57 @@ Endpoints da API:
 
 Ciclo de vida do vídeo: `draft → processing → ready | error`.
 
+### Fase 04 — Gerenciamento de Vídeos e Canal ✅
+
+Categorias de vídeo, edição, visibilidade, thumbnail customizada, publicação, e páginas públicas de canal.
+
+| Método & Rota | Auth | Descrição |
+|---------------|------|-----------|
+| `GET /categories` | Público | Lista categorias disponíveis |
+| `PATCH /videos/:id` | Bearer JWT | Editar título, descrição, categoria e visibilidade |
+| `POST /videos/:id/thumbnail` | Bearer JWT | Presigned URL para upload de thumbnail customizada |
+| `PATCH /videos/:id/publish` | Bearer JWT | Publicar vídeo (transita para status `ready`) |
+| `GET /videos` | Público | Filtragem por `category_id`; somente vídeos públicos e prontos |
+| `GET /channels/:nickname` | Público | Página pública do canal com estatísticas |
+| `GET /channels/:nickname/videos` | Público | Vídeos publicados do canal |
+| `PATCH /channels/:nickname` | Bearer JWT | Editar nome e descrição do próprio canal |
+| `GET /channels/:nickname/studio/videos` | Bearer JWT | Painel studio — todos os vídeos do canal |
+
+### Fase 05 — Página de Visualização do Vídeo ✅
+
+Player nativo HTML5, contagem de visualizações e sugestões por categoria.
+
+| Método & Rota | Auth | Descrição |
+|---------------|------|-----------|
+| `POST /videos/:slug/views` | Público | Incrementar contador de visualizações (atômico) |
+| `GET /videos/:slug/suggestions` | Público | Até 10 vídeos da mesma categoria por `view_count DESC` |
+
+### Fase 06 — Interações Sociais ✅
+
+Likes/dislikes em vídeos e comentários, comentários com respostas (max depth 1), inscrições em canais, contadores atômicos.
+
+| Método & Rota | Auth | Descrição |
+|---------------|------|-----------|
+| `POST /videos/:slug/likes` | Bearer JWT | Like ou dislike em vídeo (toggle se mesmo tipo) |
+| `DELETE /videos/:slug/likes` | Bearer JWT | Remover voto de vídeo |
+| `GET /videos/:slug/comments` | Público | Comentários paginados com respostas (max depth 1) |
+| `POST /videos/:slug/comments` | Bearer JWT | Criar comentário |
+| `POST /comments/:id/replies` | Bearer JWT | Responder a um comentário |
+| `DELETE /comments/:id` | Bearer JWT | Deletar próprio comentário |
+| `POST /comments/:id/likes` | Bearer JWT | Like ou dislike em comentário |
+| `DELETE /comments/:id/likes` | Bearer JWT | Remover voto de comentário |
+| `POST /channels/:nickname/subscriptions` | Bearer JWT | Inscrever-se em canal |
+| `DELETE /channels/:nickname/subscriptions` | Bearer JWT | Cancelar inscrição |
+| `GET /users/me/subscriptions` | Bearer JWT | Listar canais seguidos |
+
+### Fase 07 — Página Inicial, Busca e Finalização ✅
+
+Busca por texto livre (ILIKE no título e nome do canal), página inicial com grid de vídeos, header com busca, layout responsivo.
+
+| Método & Rota | Auth | Descrição |
+|---------------|------|-----------|
+| `GET /videos?q=<texto>` | Público | Busca por título (ILIKE) ou nome de canal; ordenado por `view_count DESC` |
+
 ## Estrutura do Projeto
 
 ```
@@ -454,12 +535,20 @@ mba-ia-greenfield-project/
 │   │   ├── technical-decisions-phase-01-configuracao-base.md
 │   │   ├── technical-decisions-phase-02-auth.md
 │   │   ├── technical-decisions-phase-02-auth-frontend.md
-│   │   └── technical-decisions-phase-03-videos.md
+│   │   ├── technical-decisions-phase-03-videos.md
+│   │   ├── technical-decisions-phase-04-video-management.md
+│   │   ├── technical-decisions-phase-05-video-watch.md
+│   │   ├── technical-decisions-phase-06-social.md
+│   │   └── technical-decisions-phase-07-home-search.md
 │   ├── phases/                           # Planos de implementação por fase
 │   │   ├── phase-01-configuracao-base/
 │   │   ├── phase-02-auth/
 │   │   ├── phase-02-auth-frontend/
-│   │   └── phase-03-videos/
+│   │   ├── phase-03-videos/              # context, phase plan, validation, library-refs, progress
+│   │   ├── phase-04-video-management/    # categories, visibility, publish, channel admin
+│   │   ├── phase-05-video-watch/         # HTML5 player, view count, suggestions
+│   │   ├── phase-06-social/              # likes, comments, subscriptions
+│   │   └── phase-07-home-search/         # home page, search, header, responsive, deploy
 │   └── diagrams/
 │       └── software-arch.mermaid         # Diagrama de arquitetura (C4)
 │
@@ -491,7 +580,8 @@ mba-ia-greenfield-project/
 │   │   └── database/                     # data-source, migrations, seeds
 │   ├── test/                             # Testes e2e (*.e2e-spec.ts)
 │   │   ├── auth.e2e-spec.ts
-│   │   └── videos.e2e-spec.ts
+│   │   ├── videos.e2e-spec.ts
+│   │   └── social.e2e-spec.ts            # (Fase 06)
 │   ├── compose.yaml                      # Docker Compose (API + DB + MinIO + Redis + Worker + Mailpit)
 │   ├── Dockerfile.dev                    # Node 22 + FFmpeg + curl
 │   └── .env.example                      # Template de variáveis de ambiente
@@ -499,8 +589,13 @@ mba-ia-greenfield-project/
 ├── next-frontend/                        # Frontend (Next.js 16, App Router)
 │   ├── app/                              # Rotas, layouts, páginas e Route Handlers BFF
 │   │   ├── (auth)/                       # signup, login, forgot-password
-│   │   └── api/auth/                     # Proxy same-origin → API NestJS
-│   ├── components/                       # auth, ui (shadcn), icons
+│   │   ├── watch/[slug]/                 # Página de assistir (Fase 05)
+│   │   ├── channel/[nickname]/           # Página pública do canal (Fase 04)
+│   │   ├── studio/videos/                # Gerenciamento de vídeos (Fase 04)
+│   │   ├── search/                       # Resultados de busca (Fase 07)
+│   │   ├── subscriptions/                # Canais seguidos (Fase 06)
+│   │   └── api/                          # Route Handlers BFF — proxy → API NestJS
+│   ├── components/                       # auth, video, social, home, layout, ui (shadcn)
 │   ├── lib/                              # env, api (openapi-fetch), auth/session
 │   ├── mocks/                            # MSW handlers + server (testes sem backend real)
 │   ├── hooks/                            # React hooks compartilhados
@@ -510,6 +605,7 @@ mba-ia-greenfield-project/
 │
 ├── CHANGELOG.md                          # Histórico de mudanças por fase
 ├── CLAUDE.md                             # Instruções para IA (Claude Code)
+├── Makefile                              # Atalhos para dev (install, up, test, lint)
 ├── FC Tube.fig                           # Design system do projeto (Figma)
 ├── whiteboard.svg                        # Quadro branco do projeto
 └── README.md
@@ -522,10 +618,10 @@ mba-ia-greenfield-project/
 | **01** | Configuração Base do Projeto | ✅ Concluída |
 | **02** | Cadastro, Login e Gerenciamento de Conta | ✅ Concluída |
 | **03** | Upload e Processamento de Vídeos | ✅ Concluída |
-| **04** | Gerenciamento de Vídeos e Canal | ⏳ Planejada |
-| **05** | Página de Visualização do Vídeo | ⏳ Planejada |
-| **06** | Interações Sociais (Likes, Comentários, Inscrições) | ⏳ Planejada |
-| **07** | Página Inicial, Busca e Finalização | ⏳ Planejada |
+| **04** | Gerenciamento de Vídeos e Canal | ✅ Concluída |
+| **05** | Página de Visualização do Vídeo | ✅ Concluída |
+| **06** | Interações Sociais (Likes, Comentários, Inscrições) | ✅ Concluída |
+| **07** | Página Inicial, Busca e Finalização | ✅ Concluída |
 
 Detalhes completos em [docs/project-plan.md](docs/project-plan.md).
 

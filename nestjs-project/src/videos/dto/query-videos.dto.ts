@@ -1,6 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class QueryVideosDto {
   @ApiPropertyOptional({ example: 1, minimum: 1, default: 1 })
@@ -17,4 +25,22 @@ export class QueryVideosDto {
   @Min(1)
   @Max(50)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Filter by category UUID' })
+  @IsUUID()
+  @IsOptional()
+  category_id?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by channel UUID' })
+  @IsUUID()
+  @IsOptional()
+  channel_id?: string;
+
+  @ApiPropertyOptional({
+    description: 'Full-text search on title and channel nickname',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  q?: string;
 }

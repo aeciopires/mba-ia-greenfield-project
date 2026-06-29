@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { appendRandomSuffix, sanitizeNickname } from './nickname.util';
 import { Channel } from './entities/channel.entity';
+import { UpdateChannelDto } from './dto/update-channel.dto';
+import { ChannelNotFoundException } from '../common/exceptions/domain.exception';
 
 const PG_UNIQUE_VIOLATION = '23505';
 const NICKNAME_COLUMN = 'nickname';
@@ -32,6 +34,26 @@ export class ChannelsService {
     });
   }
 
+  async findByNickname(nickname: string): Promise<Channel | null> {
+    return this.dataSource.getRepository(Channel).findOne({
+      where: { nickname },
+    });
+  }
+
+  async updateChannel(
+    userId: string,
+    nickname: string,
+    dto: UpdateChannelDto,
+  ): Promise<Channel> {
+    const channel = await this.findByNickname(nickname);
+    if (!channel || channel.user_id !== userId) {
+      throw new ChannelNotFoundException();
+    }
+    if (dto.name !== undefined) channel.name = dto.name;
+    if (dto.description !== undefined) channel.description = dto.description;
+    return this.dataSource.getRepository(Channel).save(channel);
+  }
+
   async createChannel(userId: string, email: string): Promise<Channel> {
     const baseNickname = sanitizeNickname(email.split('@')[0]);
 
@@ -57,7 +79,6 @@ export class ChannelsService {
           );
         } catch (err) {
           if (isPgUniqueViolationOnColumn(err, NICKNAME_COLUMN)) {
-            // Concurrent insert between pre-check and save — retry with new suffix
             nickname = appendRandomSuffix(baseNickname);
           } else {
             throw err;

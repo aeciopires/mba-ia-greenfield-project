@@ -4,6 +4,80 @@ All notable changes to StreamTube are documented here, organized by release phas
 
 ---
 
+## [Fases 04–07 + Correções de Testes] — 2026-06-29
+
+### Backend — Gerenciamento de Vídeos, Canal e Social (`nestjs-project/`)
+
+**Fase 04 — Categorias, Edição e Publicação**
+- `CategoriesModule` + entidade `Category` com `GET /categories` (público)
+- `VideosModule` expandido: `PATCH /videos/:id` (edição), `POST /videos/:id/thumbnail` (presigned URL para thumbnail customizada), `PATCH /videos/:id/publish` (publicação)
+- Enum `visibility` (`public | unlisted`) + campo `published_at` + FK nullable `category_id` na entidade `Video`
+- `ChannelsModule` expandido: `GET /channels/:nickname`, `GET /channels/:nickname/videos`, `PATCH /channels/:nickname`, `GET /channels/:nickname/studio/videos`
+- Migração `1781000000000-Phase04VideoManagement`
+
+**Fase 05 — Visualização e Sugestões**
+- `POST /videos/:slug/views` — incremento atômico de `view_count`
+- `GET /videos/:slug/suggestions` — até 10 vídeos da mesma categoria por `view_count DESC`
+- Migração `1782000000000-Phase05ViewCount`: coluna `view_count` em `videos`
+
+**Fase 06 — Interações Sociais**
+- `SocialModule` composto de `VideoLikesModule`, `CommentsModule`, `CommentLikesModule`, `SubscriptionsModule`
+- 11 novos endpoints: likes/dislikes em vídeos e comentários, comentários com respostas (max depth 1), inscrições em canais, listagem de assinaturas
+- Contadores atômicos: `likes_count`, `dislikes_count`, `comments_count` em `videos`; `subscribers_count` em `channels`
+- Migração `1783000000000-Phase06SocialFeatures`: 4 novas tabelas + colunas de contador
+
+**Fase 07 — Busca**
+- `GET /videos?q=<texto>` — busca ILIKE no título e no nickname do canal, ordenado por `view_count DESC`
+
+### Frontend — Páginas e Componentes (`next-frontend/`)
+
+- `/studio/videos` — painel de vídeos do canal autenticado com edição e publicação
+- `/channel/[nickname]` — perfil público do canal
+- `/watch/[slug]` — player HTML5, view count, sugestões, like/dislike e comentários
+- `/subscriptions` — canais seguidos pelo usuário autenticado
+- `/` (home) — grid de vídeos mais assistidos
+- `/search` — resultados de busca (`?q=`)
+- Header com busca, logo e menu de autenticação
+- Route Handlers BFF para todos os novos endpoints
+
+### Correções de Testes e Isolamento de Infraestrutura
+
+- **TypeORM entity metadata**: `Category` adicionada ao array de entidades em 5 arquivos de teste que incluíam `Video` sem a entidade relacionada (`Video#category`)
+- **BullMQ Redis hang**: 4 arquivos de módulo spec agora usam `ConfigModule.forRoot` com `queueConfig` + `storageConfig` e `.overrideProvider(getQueueToken(VIDEO_PROCESSING_QUEUE))` para evitar conexão Redis real no DI graph de teste (`ChannelsModule → forwardRef(VideosModule) → QueueModule`)
+- **`migrations.integration-spec.ts`**: atualizado para todas as 6 migrações e 10 tabelas; limpeza de todos os enum types criados nas fases 04-06
+- **Frontend TypeScript**: `session.access_token` → `session.accessToken` em 14 arquivos BFF; `StreamtubeIcon` → `StreamTubeIcon`; cast `NextResponse<never>` na rota de stream
+
+### Makefile
+
+- `Makefile` na raiz com targets: `install`, `up`, `down`, `logs`, `test`, `test-backend`, `test-e2e`, `test-frontend`, `lint`, `typecheck`, `migrate`, `seed`
+
+---
+
+## [Planejamento Fases 04–07] — 2026-06-29
+
+### Documentação de Planejamento
+
+Criados todos os documentos de decisões técnicas e planos de implementação (Step Implementations) para as fases 04 a 07.
+
+**Decisões técnicas criadas:**
+- `docs/decisions/technical-decisions-phase-04-video-management.md` — 5 TDs: categorias (tabela separada), thumbnail customizado (presigned URL), visibilidade (`public | unlisted`), fluxo de publicação (endpoint PATCH /publish), contadores denormalizados
+- `docs/decisions/technical-decisions-phase-05-video-watch.md` — 4 TDs: player nativo HTML5, view count síncrono (POST /views), sugestões por categoria, acesso a vídeos unlisted por link direto
+- `docs/decisions/technical-decisions-phase-06-social.md` — 4 TDs: likes/dislikes (tabela única com `type`), estrutura de comentários (adjacency list, max depth 1), contadores atômicos, inscrições em canais (join table)
+- `docs/decisions/technical-decisions-phase-07-home-search.md` — 4 TDs: busca com `ILIKE`, paginação offset com "Load more", header compartilhado em `layout.tsx`, breakpoints Tailwind mobile-first
+
+**Planos de implementação criados (cada fase com 5 arquivos):**
+- `docs/phases/phase-04-video-management/` — 10 SIs: migration, CategoriesModule, VideosService updates, 3 novos endpoints, GET /videos updates, ChannelsModule, páginas frontend Studio e Canal, testes, docs
+- `docs/phases/phase-05-video-watch/` — 7 SIs: view_count column, /views endpoint, /suggestions endpoint, BFF handlers, watch page + player, suggestions sidebar, testes
+- `docs/phases/phase-06-social/` — 10 SIs: migration 4 tabelas + counter columns, VideoLikesModule, CommentsModule, CommentLikesModule, SubscriptionsModule, SocialModule, like/dislike buttons, comment section, subscribe button, testes
+- `docs/phases/phase-07-home-search/` — 8 SIs: /videos?q= ILIKE search, BFF forward q param, Header component, home page + VideoGrid, search results page, responsive layout pass, production Docker Compose, testes finais
+
+**Documentação geral:**
+- `README.md` — atualizado com estrutura de diretórios das fases 04-07, seções de funcionalidades planejadas, mermaid do fluxo de interações sociais, endpoints planejados
+- `nestjs-project/CLAUDE.md` — adicionada seção "Planned Modules (Phases 04–07)" na seção Architecture
+- `CHANGELOG.md` — adicionada esta seção
+
+---
+
 ## [Fase 03] — 2026-06-29
 
 ### Backend — Upload e Processamento de Vídeos (`nestjs-project/`)

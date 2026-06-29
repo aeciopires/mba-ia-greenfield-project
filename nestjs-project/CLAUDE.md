@@ -157,6 +157,19 @@ NestJS with standard module structure. Source lives in `src/`, compiled output i
 - `QueueModule` — wraps BullMQ (`@nestjs/bullmq`) with Redis connection; registers the `video-processing` queue
 - `VideosModule` — `videos/` domain: entity, service (7 methods), controller (7 endpoints), processor (`video-processing.processor.ts`)
 
+### Planned Modules (Phases 04–07)
+
+- **`CategoriesModule`** (Phase 04) — `categories` table; `GET /categories`; `category_id` FK on videos
+- **`VideosModule` extensions** (Phase 04) — `PATCH /videos/:id` (edit), `POST /videos/:id/thumbnail` (custom thumbnail presigned URL), `PATCH /videos/:id/publish` (draft → published); visibility enum (`public | unlisted`)
+- **`ChannelsModule`** (Phase 04) — `GET /channels/:nickname` (public channel page), `GET /channels/:nickname/videos`, `PATCH /channels/:nickname` (edit own channel)
+- **`VideosModule` extensions** (Phase 05) — `POST /videos/:slug/views` (atomic view count increment); `GET /videos/:slug/suggestions` (same-category, top by view_count)
+- **`SocialModule`** (Phase 06) — composed of:
+  - `VideoLikesModule` — `video_likes` table; `POST/DELETE /videos/:slug/likes`
+  - `CommentsModule` — `comments` table (adjacency list, max depth 1); `GET /videos/:slug/comments`, `POST /videos/:slug/comments`, `POST /comments/:id/replies`, `DELETE /comments/:id`
+  - `CommentLikesModule` — `comment_likes` table; `POST/DELETE /comments/:id/likes`
+  - `SubscriptionsModule` — `channel_subscriptions` table; `POST/DELETE /channels/:nickname/subscriptions`, `GET /users/me/subscriptions`
+- **`VideosModule` extensions** (Phase 07) — `GET /videos?q=` free-text search via `ILIKE` on title + channel nickname; default ordering by `view_count DESC`
+
 ## Video Upload Flow
 
 1. Client calls `POST /videos` → API creates a draft Video record and returns a presigned PUT URL (via `StorageService.generateUploadPresignedUrl`)
