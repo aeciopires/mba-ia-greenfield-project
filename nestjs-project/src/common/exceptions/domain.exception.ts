@@ -48,3 +48,15 @@ export class TokenReuseDetectedException extends DomainException {
     );
   }
 }
+
+export class VideoNotFoundException extends DomainException {
+  constructor() {
+    super('VIDEO_NOT_FOUND', 404, 'Video not found');
+  }
+}
+
+export class VideoNotInDraftStatusException extends DomainException {
+  constructor() {
+    super('VIDEO_NOT_IN_DRAFT_STATUS', 409, 'Video is not in draft status');
+  }
+}
