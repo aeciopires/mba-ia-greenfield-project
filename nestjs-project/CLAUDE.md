@@ -33,10 +33,11 @@ docker compose exec nestjs-api npm run start:dev
 
 Services:
 - `nestjs-api` — NestJS API, port `3000`
-- `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
-- `minio` — S3-compatible object storage, API port `9000`, console port `9001`, credentials `streamtube/streamtube`
+- `db` — PostgreSQL 17, port `5432`, database/user/password `streamtube`
+- `mailpit` — SMTP (port `1025`) + web UI (port `8025`) for local email capture
+- `minio` — S3-compatible object storage; API port `9000`, console port `9001`, credentials `streamtube/streamtube`
 - `redis` — Redis 7.4, port `6379`
-- `video-worker` — FFmpeg worker (separate container, same image), no HTTP port
+- `video-worker` — FFmpeg worker (same image as `nestjs-api`, entrypoint `npm run start:worker:dev`), no HTTP port
 
 All verification and teardown commands run on the **host machine**:
 
@@ -150,33 +151,33 @@ Whenever possible, prefer storing only the bare address in `.env` and composing 
 
 NestJS with standard module structure. Source lives in `src/`, compiled output in `dist/`.
 
-- Each domain feature gets its own module (e.g., `UsersModule`, `VideosModule`) registered in `AppModule`
+- Each domain feature gets its own module registered in `AppModule`
 - Controllers handle HTTP routing; Services hold business logic; both are scoped to their module
-- `worker.ts` / `WorkerModule` — separate entrypoint for the video-worker container; bootstrapped via `NestFactory.createApplicationContext` (no HTTP server)
-- `StorageModule` — wraps AWS SDK v3 S3Client configured for MinIO (`forcePathStyle: true`); provides `StorageService` with presigned URL and direct upload methods
-- `QueueModule` — wraps BullMQ (`@nestjs/bullmq`) with Redis connection; registers the `video-processing` queue
-- `VideosModule` — `videos/` domain: entity, service (7 methods), controller (7 endpoints), processor (`video-processing.processor.ts`)
+- `worker.ts` / `WorkerModule` — separate entrypoint for the `video-worker` container; bootstrapped via `NestFactory.createApplicationContext` (no HTTP server)
 
-### Planned Modules (Phases 04–07)
+### Implemented Modules
 
-- **`CategoriesModule`** (Phase 04) — `categories` table; `GET /categories`; `category_id` FK on videos
-- **`VideosModule` extensions** (Phase 04) — `PATCH /videos/:id` (edit), `POST /videos/:id/thumbnail` (custom thumbnail presigned URL), `PATCH /videos/:id/publish` (draft → published); visibility enum (`public | unlisted`)
-- **`ChannelsModule`** (Phase 04) — `GET /channels/:nickname` (public channel page), `GET /channels/:nickname/videos`, `PATCH /channels/:nickname` (edit own channel)
-- **`VideosModule` extensions** (Phase 05) — `POST /videos/:slug/views` (atomic view count increment); `GET /videos/:slug/suggestions` (same-category, top by view_count)
-- **`SocialModule`** (Phase 06) — composed of:
-  - `VideoLikesModule` — `video_likes` table; `POST/DELETE /videos/:slug/likes`
-  - `CommentsModule` — `comments` table (adjacency list, max depth 1); `GET /videos/:slug/comments`, `POST /videos/:slug/comments`, `POST /comments/:id/replies`, `DELETE /comments/:id`
-  - `CommentLikesModule` — `comment_likes` table; `POST/DELETE /comments/:id/likes`
-  - `SubscriptionsModule` — `channel_subscriptions` table; `POST/DELETE /channels/:nickname/subscriptions`, `GET /users/me/subscriptions`
-- **`VideosModule` extensions** (Phase 07) — `GET /videos?q=` free-text search via `ILIKE` on title + channel nickname; default ordering by `view_count DESC`
+| Module | Path | Notes |
+|---|---|---|
+| `AuthModule` | `src/auth/` | JWT auth, refresh token rotation, email confirm, password reset; registers global `JwtAuthGuard` via `APP_GUARD` |
+| `UsersModule` | `src/users/` | `User` entity + `UsersService` |
+| `ChannelsModule` | `src/channels/` | `Channel` entity (1:1 with user); public page, studio endpoint, update; exports `ChannelsService` |
+| `VideosModule` | `src/videos/` | `Video` entity (status lifecycle, visibility, slug, view/like counts); full upload-process-stream flow; registers `VideoProcessingProcessor` |
+| `CategoriesModule` | `src/categories/` | `Category` entity; `GET /categories`; seeded via `database/seeds/seed.ts` |
+| `SocialModule` | `src/social/` | Composed of `VideoLikesModule`, `CommentsModule`, `CommentLikesModule`, `SubscriptionsModule` |
+| `StorageModule` | `src/storage/` | AWS SDK v3 `S3Client` for MinIO (`forcePathStyle: true`); presigned PUT/GET URL generation |
+| `QueueModule` | `src/queue/` | BullMQ `@nestjs/bullmq` + Redis; registers `video-processing` queue |
+| `MailModule` | `src/mail/` | Nodemailer + Handlebars templates; auth email flows |
+| `DatabaseModule` | `src/database/` | TypeORM data-source config + versioned migrations |
 
-## Video Upload Flow
+### Video Upload Flow
 
-1. Client calls `POST /videos` → API creates a draft Video record and returns a presigned PUT URL (via `StorageService.generateUploadPresignedUrl`)
+1. Client calls `POST /videos` → API creates a `draft` Video record and returns a presigned PUT URL (via `StorageService.generateUploadPresignedUrl`)
 2. Client uploads file directly to MinIO using the presigned URL (API never sees the bytes)
 3. Client calls `PATCH /videos/:id/start-processing` → API transitions video to `processing` and enqueues a BullMQ job
-4. `VideoProcessingProcessor` (in video-worker container) picks up the job, uses ffprobe + ffmpeg to extract metadata and generate a thumbnail, uploads thumbnail to MinIO, and updates video to `ready`
-5. Stream: `GET /videos/:slug/stream` → 302 redirect to presigned GET URL (MinIO handles Range requests natively)
+4. `VideoProcessingProcessor` (in `video-worker` container) picks up the job, runs ffprobe to extract duration/metadata and ffmpeg to generate a thumbnail frame, uploads thumbnail to MinIO, updates video to `ready`
+5. Stream: `GET /videos/:slug/stream` → 302 redirect to presigned GET URL (MinIO handles HTTP Range requests natively)
+6. Download: `GET /videos/:slug/download` → 302 redirect to presigned GET URL with `content-disposition: attachment`
 
 ## Environment Variables (MinIO and Redis)
 
