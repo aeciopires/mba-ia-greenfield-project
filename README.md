@@ -11,6 +11,7 @@
     - [2. Frontend (Next.js)](#2-frontend-nextjs)
   - [Fluxo de Upload de Vídeo](#fluxo-de-upload-de-vídeo)
   - [Fluxo de Autenticação](#fluxo-de-autenticação)
+  - [Makefile — Atalhos de Desenvolvimento](#makefile--atalhos-de-desenvolvimento)
   - [Testes](#testes)
     - [Backend (Jest)](#backend-jest)
     - [Frontend (Vitest + Playwright)](#frontend-vitest--playwright)
@@ -24,15 +25,14 @@
     - [7. Consultar vídeo processado](#7-consultar-vídeo-processado)
     - [8. Assistir / Baixar](#8-assistir--baixar)
     - [9. Remover vídeo](#9-remover-vídeo)
-  - [Makefile — Atalhos de Desenvolvimento](#makefile--atalhos-de-desenvolvimento)
   - [Funcionalidades Implementadas](#funcionalidades-implementadas)
     - [Fase 01 — Configuração Base](#fase-01--configuração-base)
     - [Fase 02 — Autenticação](#fase-02--autenticação)
-    - [Fase 03 — Upload e Processamento de Vídeos ✅](#fase-03--upload-e-processamento-de-vídeos-)
-    - [Fase 04 — Gerenciamento de Vídeos e Canal ✅](#fase-04--gerenciamento-de-vídeos-e-canal-)
-    - [Fase 05 — Página de Visualização do Vídeo ✅](#fase-05--página-de-visualização-do-vídeo-)
-    - [Fase 06 — Interações Sociais ✅](#fase-06--interações-sociais-)
-    - [Fase 07 — Página Inicial, Busca e Finalização ✅](#fase-07--página-inicial-busca-e-finalização-)
+    - [Fase 03 — Upload e Processamento de Vídeos](#fase-03--upload-e-processamento-de-vídeos)
+    - [Fase 04 — Gerenciamento de Vídeos e Canal](#fase-04--gerenciamento-de-vídeos-e-canal)
+    - [Fase 05 — Página de Visualização do Vídeo](#fase-05--página-de-visualização-do-vídeo)
+    - [Fase 06 — Interações Sociais](#fase-06--interações-sociais)
+    - [Fase 07 — Página Inicial, Busca e Finalização](#fase-07--página-inicial-busca-e-finalização)
   - [Estrutura do Projeto](#estrutura-do-projeto)
   - [Fases do Projeto](#fases-do-projeto)
   - [Stack Tecnológica](#stack-tecnológica)
@@ -458,7 +458,7 @@ Segurança: senhas com **Argon2**, **JWT** com `JwtAuthGuard` global (opt-out vi
 
 Telas no frontend: `/(auth)/signup`, `/(auth)/login`, `/(auth)/forgot-password` com React Hook Form + Zod.
 
-### Fase 03 — Upload e Processamento de Vídeos ✅
+### Fase 03 — Upload e Processamento de Vídeos
 
 Endpoints da API:
 
@@ -474,7 +474,7 @@ Endpoints da API:
 
 Ciclo de vida do vídeo: `draft → processing → ready | error`.
 
-### Fase 04 — Gerenciamento de Vídeos e Canal ✅
+### Fase 04 — Gerenciamento de Vídeos e Canal
 
 Categorias de vídeo, edição, visibilidade, thumbnail customizada, publicação, e páginas públicas de canal.
 
@@ -490,7 +490,7 @@ Categorias de vídeo, edição, visibilidade, thumbnail customizada, publicaçã
 | `PATCH /channels/:nickname` | Bearer JWT | Editar nome e descrição do próprio canal |
 | `GET /channels/:nickname/studio/videos` | Bearer JWT | Painel studio — todos os vídeos do canal |
 
-### Fase 05 — Página de Visualização do Vídeo ✅
+### Fase 05 — Página de Visualização do Vídeo
 
 Player nativo HTML5, contagem de visualizações e sugestões por categoria.
 
@@ -499,7 +499,7 @@ Player nativo HTML5, contagem de visualizações e sugestões por categoria.
 | `POST /videos/:slug/views` | Público | Incrementar contador de visualizações (atômico) |
 | `GET /videos/:slug/suggestions` | Público | Até 10 vídeos da mesma categoria por `view_count DESC` |
 
-### Fase 06 — Interações Sociais ✅
+### Fase 06 — Interações Sociais
 
 Likes/dislikes em vídeos e comentários, comentários com respostas (max depth 1), inscrições em canais, contadores atômicos.
 
@@ -517,7 +517,7 @@ Likes/dislikes em vídeos e comentários, comentários com respostas (max depth 
 | `DELETE /channels/:nickname/subscriptions` | Bearer JWT | Cancelar inscrição |
 | `GET /users/me/subscriptions` | Bearer JWT | Listar canais seguidos |
 
-### Fase 07 — Página Inicial, Busca e Finalização ✅
+### Fase 07 — Página Inicial, Busca e Finalização
 
 Busca por texto livre (ILIKE no título e nome do canal), página inicial com grid de vídeos, header com busca, layout responsivo.
 
