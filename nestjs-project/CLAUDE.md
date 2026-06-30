@@ -33,7 +33,11 @@ docker compose exec nestjs-api npm run start:dev
 
 Services:
 - `nestjs-api` — NestJS API, port `3000`
-- `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
+- `db` — PostgreSQL 17, port `5432`, database/user/password `streamtube`
+- `mailpit` — SMTP (port `1025`) + web UI (port `8025`) for local email capture
+- `minio` — S3-compatible object storage; API port `9000`, console port `9001`, credentials `streamtube/streamtube`
+- `redis` — Redis 7.4, port `6379`
+- `video-worker` — FFmpeg worker (same image as `nestjs-api`, entrypoint `npm run start:worker:dev`), no HTTP port
 
 All verification and teardown commands run on the **host machine**:
 
@@ -60,6 +64,7 @@ docker compose down
 
 ```bash
 npm run start:dev                        # Dev server with hot-reload
+npm run start:worker:dev                 # Video worker with hot-reload (in video-worker container)
 npm run build                            # Compile to dist/
 npm run start:prod                       # Run compiled build
 
@@ -146,8 +151,49 @@ Whenever possible, prefer storing only the bare address in `.env` and composing 
 
 NestJS with standard module structure. Source lives in `src/`, compiled output in `dist/`.
 
-- Each domain feature gets its own module (e.g., `UsersModule`, `VideosModule`) registered in `AppModule`
+- Each domain feature gets its own module registered in `AppModule`
 - Controllers handle HTTP routing; Services hold business logic; both are scoped to their module
+- `worker.ts` / `WorkerModule` — separate entrypoint for the `video-worker` container; bootstrapped via `NestFactory.createApplicationContext` (no HTTP server)
+
+### Implemented Modules
+
+| Module | Path | Notes |
+|---|---|---|
+| `AuthModule` | `src/auth/` | JWT auth, refresh token rotation, email confirm, password reset; registers global `JwtAuthGuard` via `APP_GUARD` |
+| `UsersModule` | `src/users/` | `User` entity + `UsersService` |
+| `ChannelsModule` | `src/channels/` | `Channel` entity (1:1 with user); public page, studio endpoint, update; exports `ChannelsService` |
+| `VideosModule` | `src/videos/` | `Video` entity (status lifecycle, visibility, slug, view/like counts); full upload-process-stream flow; registers `VideoProcessingProcessor` |
+| `CategoriesModule` | `src/categories/` | `Category` entity; `GET /categories`; seeded via `database/seeds/seed.ts` |
+| `SocialModule` | `src/social/` | Composed of `VideoLikesModule`, `CommentsModule`, `CommentLikesModule`, `SubscriptionsModule` |
+| `StorageModule` | `src/storage/` | AWS SDK v3 `S3Client` for MinIO (`forcePathStyle: true`); presigned PUT/GET URL generation |
+| `QueueModule` | `src/queue/` | BullMQ `@nestjs/bullmq` + Redis; registers `video-processing` queue |
+| `MailModule` | `src/mail/` | Nodemailer + Handlebars templates; auth email flows |
+| `DatabaseModule` | `src/database/` | TypeORM data-source config + versioned migrations |
+
+### Video Upload Flow
+
+1. Client calls `POST /videos` → API creates a `draft` Video record and returns a presigned PUT URL (via `StorageService.generateUploadPresignedUrl`)
+2. Client uploads file directly to MinIO using the presigned URL (API never sees the bytes)
+3. Client calls `PATCH /videos/:id/start-processing` → API transitions video to `processing` and enqueues a BullMQ job
+4. `VideoProcessingProcessor` (in `video-worker` container) picks up the job, runs ffprobe to extract duration/metadata and ffmpeg to generate a thumbnail frame, uploads thumbnail to MinIO, updates video to `ready`
+5. Stream: `GET /videos/:slug/stream` → 302 redirect to presigned GET URL (MinIO handles HTTP Range requests natively)
+6. Download: `GET /videos/:slug/download` → 302 redirect to presigned GET URL with `content-disposition: attachment`
+
+## Environment Variables (MinIO and Redis)
+
+These are required beyond the base database/auth variables:
+
+```
+MINIO_ENDPOINT=minio          # Docker service name
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=streamtube
+MINIO_SECRET_KEY=streamtube
+MINIO_BUCKET=streamtube
+MINIO_USE_SSL=false
+MINIO_PUBLIC_ENDPOINT=http://localhost:9000
+REDIS_HOST=redis              # Docker service name
+REDIS_PORT=6379
+```
 
 ## Code Conventions
 

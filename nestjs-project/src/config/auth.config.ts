@@ -13,4 +13,5 @@ export default registerAs('auth', () => ({
     process.env.PASSWORD_RESET_TOKEN_EXPIRATION_HOURS || '1',
     10,
   ),
+  requireEmailConfirmation: process.env.REQUIRE_EMAIL_CONFIRMATION !== 'false',
 }));

@@ -2,24 +2,57 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { appendRandomSuffix, sanitizeNickname } from './nickname.util';
 import { Channel } from './entities/channel.entity';
+import { UpdateChannelDto } from './dto/update-channel.dto';
+import { ChannelNotFoundException } from '../common/exceptions/domain.exception';
 
 const PG_UNIQUE_VIOLATION = '23505';
 const NICKNAME_COLUMN = 'nickname';
 const MAX_RETRIES = 5;
 
+interface PgDriverError {
+  code?: string;
+  detail?: string;
+}
+
 function isPgUniqueViolationOnColumn(err: unknown, column: string): boolean {
   if (!(err instanceof QueryFailedError)) return false;
-  const e = err as any;
+  const driverErr = err.driverError as PgDriverError;
   return (
-    e.code === PG_UNIQUE_VIOLATION &&
-    typeof e.detail === 'string' &&
-    e.detail.includes(column)
+    driverErr.code === PG_UNIQUE_VIOLATION &&
+    typeof driverErr.detail === 'string' &&
+    driverErr.detail.includes(column)
   );
 }
 
 @Injectable()
 export class ChannelsService {
   constructor(private readonly dataSource: DataSource) {}
+
+  async findByUserId(userId: string): Promise<Channel | null> {
+    return this.dataSource.getRepository(Channel).findOne({
+      where: { user_id: userId },
+    });
+  }
+
+  async findByNickname(nickname: string): Promise<Channel | null> {
+    return this.dataSource.getRepository(Channel).findOne({
+      where: { nickname },
+    });
+  }
+
+  async updateChannel(
+    userId: string,
+    nickname: string,
+    dto: UpdateChannelDto,
+  ): Promise<Channel> {
+    const channel = await this.findByNickname(nickname);
+    if (!channel || channel.user_id !== userId) {
+      throw new ChannelNotFoundException();
+    }
+    if (dto.name !== undefined) channel.name = dto.name;
+    if (dto.description !== undefined) channel.description = dto.description;
+    return this.dataSource.getRepository(Channel).save(channel);
+  }
 
   async createChannel(userId: string, email: string): Promise<Channel> {
     const baseNickname = sanitizeNickname(email.split('@')[0]);
@@ -46,7 +79,6 @@ export class ChannelsService {
           );
         } catch (err) {
           if (isPgUniqueViolationOnColumn(err, NICKNAME_COLUMN)) {
-            // Concurrent insert between pre-check and save — retry with new suffix
             nickname = appendRandomSuffix(baseNickname);
           } else {
             throw err;

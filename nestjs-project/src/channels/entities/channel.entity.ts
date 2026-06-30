@@ -29,6 +29,9 @@ export class Channel {
   @CreateDateColumn()
   created_at: Date;
 
+  @Column({ type: 'integer', default: 0 })
+  subscribers_count: number;
+
   @UpdateDateColumn()
   updated_at: Date;
 

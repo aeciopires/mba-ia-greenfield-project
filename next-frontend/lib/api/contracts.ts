@@ -5,29 +5,11 @@
  * from `./types.gen`. Every Route Handler and every Component consumes BFF
  * shapes via named aliases exported from here — never by indexing `paths`
  * directly elsewhere.
- *
- * Two alias forms by convention:
- *
- * 1. **Pass-through alias** — BFF returns the upstream NestJS shape as-is.
- *    The alias indexes `paths` for the route's success-content type:
- *
- *      export type Video =
- *        paths["/videos/{id}"]["get"]["responses"][200]["content"]["application/json"];
- *
- * 2. **Reshape alias** — BFF projects a subset or composed shape. The alias
- *    name is named-only (does NOT index `paths`), making reshapes greppable
- *    against the wire shape:
- *
- *      export type VideoCard = Pick<Video, "id" | "title" | "thumbnailUrl">;
- *
- * Feature SIs append aliases here as endpoints are wired through the BFF.
- * The barrel starts empty by design.
  */
 import type { paths } from "./types.gen";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-// Request bodies (fields are empty in the current openapi.json — will expand as the upstream spec grows)
 export type RegisterDto =
   paths["/auth/register"]["post"]["requestBody"]["content"]["application/json"];
 
@@ -40,18 +22,135 @@ export type ForgotPasswordDto =
 export type RefreshTokenDto =
   paths["/auth/refresh"]["post"]["requestBody"]["content"]["application/json"];
 
-// Upstream success response bodies
 export type RegisterResponse =
   paths["/auth/register"]["post"]["responses"][201]["content"]["application/json"];
 
-// LoginTokenPair: upstream 200 body — BFF reads it to seal into the iron-session cookie;
-// tokens never cross to the browser (per phase-02-auth-frontend/TD-02).
 export type LoginTokenPair =
   paths["/auth/login"]["post"]["responses"][200]["content"]["application/json"];
 
 export type RefreshTokenPair =
   paths["/auth/refresh"]["post"]["responses"][200]["content"]["application/json"];
 
-// Shared error envelope (all auth 4xx responses)
 export type ApiErrorEnvelope =
   paths["/auth/register"]["post"]["responses"][400]["content"]["application/json"];
+
+// ─── Categories ───────────────────────────────────────────────────────────────
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Channels ─────────────────────────────────────────────────────────────────
+
+export type MyChannel =
+  paths["/channels/me"]["get"]["responses"][200]["content"]["application/json"];
+
+export interface Channel {
+  id: string;
+  name: string;
+  nickname: string;
+  description: string | null;
+  user_id: string;
+  subscribers_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateChannelDto {
+  name?: string;
+  description?: string;
+}
+
+// ─── Videos ───────────────────────────────────────────────────────────────────
+
+export type VideoStatus = "draft" | "processing" | "ready" | "error";
+export type VideoVisibility = "public" | "unlisted";
+export type VoteType = "like" | "dislike";
+
+export interface Video {
+  id: string;
+  channel_id: string;
+  category_id: string | null;
+  title: string;
+  description: string | null;
+  status: VideoStatus;
+  visibility: VideoVisibility;
+  storage_key: string | null;
+  thumbnail_key: string | null;
+  duration: number | null;
+  metadata: Record<string, unknown> | null;
+  slug: string;
+  error_message: string | null;
+  view_count: number;
+  likes_count: number;
+  dislikes_count: number;
+  comments_count: number;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  channel?: Channel;
+  category?: Category | null;
+}
+
+export interface VideoListResponse {
+  data: Video[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreateVideoDto {
+  title: string;
+  description?: string;
+  content_type: string;
+}
+
+export interface UpdateVideoDto {
+  title?: string;
+  description?: string;
+  category_id?: string;
+  visibility?: VideoVisibility;
+}
+
+export interface InitiateUploadResponse {
+  video: Video;
+  presigned_upload_url: string;
+}
+
+export interface VoteSummary {
+  likes_count: number;
+  dislikes_count: number;
+  user_vote: VoteType | null;
+}
+
+// ─── Comments ─────────────────────────────────────────────────────────────────
+
+export interface Comment {
+  id: string;
+  video_id: string;
+  user_id: string;
+  parent_id: string | null;
+  content: string;
+  likes_count: number;
+  dislikes_count: number;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    id: string;
+    email: string;
+  };
+  replies?: Comment[];
+}
+
+export interface CommentListResponse {
+  data: Comment[];
+  total: number;
+}
+
+export interface CreateCommentDto {
+  content: string;
+}

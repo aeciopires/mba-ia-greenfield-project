@@ -7,14 +7,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { server } from "@/mocks/server"
 import { LoginForm } from "../login-form"
 
-const { refreshMock } = vi.hoisted(() => ({ refreshMock: vi.fn() }))
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: refreshMock }),
-}))
+// Stub window.location so hard-navigation after login is testable.
+// Keep a valid base URL so MSW can resolve relative fetch paths (/api/...).
+const locationStub = { href: "http://localhost/" }
+vi.stubGlobal("location", locationStub)
 
 beforeEach(() => {
-  refreshMock.mockClear()
+  locationStub.href = "http://localhost/"
 })
 
 function envelope(statusCode: number, message: string) {
@@ -27,7 +26,7 @@ async function fillValid(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("<LoginForm /> wiring", () => {
-  it("submits a typed payload, refreshes on 200, and exposes no tokens", async () => {
+  it("submits a typed payload, hard-navigates to / on 200, and exposes no tokens", async () => {
     const user = userEvent.setup()
     const received: Record<string, unknown>[] = []
     server.use(
@@ -42,7 +41,7 @@ describe("<LoginForm /> wiring", () => {
     await fillValid(user)
     await user.click(screen.getByRole("button", { name: "Sign in" }))
 
-    await waitFor(() => expect(refreshMock).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(locationStub.href).toBe("/"))
     expect(received).toHaveLength(1)
     expect(received[0]).toEqual({
       email: "alice@example.com",
@@ -68,7 +67,7 @@ describe("<LoginForm /> wiring", () => {
 
     const alert = await screen.findByRole("alert")
     expect(alert).toHaveTextContent("Credenciais inválidas")
-    expect(refreshMock).not.toHaveBeenCalled()
+    expect(locationStub.href).toBe("http://localhost/")
   })
 
   it("maps a 403 to an email-not-confirmed alert with a resend CTA", async () => {

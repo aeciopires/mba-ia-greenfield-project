@@ -4,14 +4,27 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import appConfig from '../config/app.config';
 import authConfig from '../config/auth.config';
 import mailConfig from '../config/mail.config';
+import queueConfig from '../config/queue.config';
+import storageConfig from '../config/storage.config';
+import { getQueueToken } from '@nestjs/bullmq';
 import { Channel } from '../channels/entities/channel.entity';
 import { User } from '../users/entities/user.entity';
+import { Video } from '../videos/entities/video.entity';
+import { Category } from '../categories/entities/category.entity';
 import { createTestDataSource } from '../test/create-test-data-source';
 import { AuthModule } from './auth.module';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { VerificationToken } from './entities/verification-token.entity';
+import { VIDEO_PROCESSING_QUEUE } from '../queue/queue.constants';
 
-const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken];
+const ALL_ENTITIES = [
+  User,
+  Channel,
+  RefreshToken,
+  VerificationToken,
+  Video,
+  Category,
+];
 
 describe('AuthModule', () => {
   it('should compile successfully with JwtModule, TypeOrmModule, UsersModule, and MailModule', async () => {
@@ -19,12 +32,15 @@ describe('AuthModule', () => {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
-          load: [appConfig, authConfig, mailConfig],
+          load: [appConfig, authConfig, mailConfig, queueConfig, storageConfig],
         }),
         TypeOrmModule.forRoot(createTestDataSource(ALL_ENTITIES).options),
         AuthModule,
       ],
-    }).compile();
+    })
+      .overrideProvider(getQueueToken(VIDEO_PROCESSING_QUEUE))
+      .useValue({ add: jest.fn(), close: jest.fn() })
+      .compile();
 
     expect(module).toBeDefined();
     await module.close();
