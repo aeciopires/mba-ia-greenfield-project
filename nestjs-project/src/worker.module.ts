@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import type { ConfigType } from '@nestjs/config';
 import { Video } from './videos/entities/video.entity';
+import { Channel } from './channels/entities/channel.entity';
+import { Category } from './categories/entities/category.entity';
+import { User } from './users/entities/user.entity';
 import { StorageModule } from './storage/storage.module';
 import { QueueModule } from './queue/queue.module';
 import { VideoProcessingProcessor } from './videos/processors/video-processing.processor';
@@ -32,7 +35,7 @@ import { envValidationSchema } from './config/env.validation';
         synchronize: false,
       }),
     }),
-    TypeOrmModule.forFeature([Video]),
+    TypeOrmModule.forFeature([Video, Channel, Category, User]),
     StorageModule,
     QueueModule,
   ],
