@@ -17,6 +17,7 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
 
 function makeRepo(overrides: Record<string, jest.Mock> = {}): any {
   return {
+    count: jest.fn().mockResolvedValue(0),
     find: jest.fn().mockResolvedValue([]),
     findOne: jest.fn().mockResolvedValue(null),
     create: jest.fn().mockImplementation((dto) => Object.assign(new Category(), dto)),
@@ -33,6 +34,27 @@ describe('CategoriesService', () => {
   beforeEach(() => {
     repo = makeRepo();
     service = new CategoriesService(repo);
+  });
+
+  // ── onApplicationBootstrap ───────────────────────────────────────────────────
+
+  describe('onApplicationBootstrap', () => {
+    it('seeds 8 default categories when table is empty', async () => {
+      repo.count.mockResolvedValue(0);
+
+      await service.onApplicationBootstrap();
+
+      expect(repo.count).toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledTimes(8);
+    });
+
+    it('skips seeding when categories already exist', async () => {
+      repo.count.mockResolvedValue(3);
+
+      await service.onApplicationBootstrap();
+
+      expect(repo.save).not.toHaveBeenCalled();
+    });
   });
 
   // ── findAll ──────────────────────────────────────────────────────────────────

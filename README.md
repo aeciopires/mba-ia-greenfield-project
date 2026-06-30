@@ -6,6 +6,7 @@
   - [Design System (Figma)](#design-system-figma)
   - [Pré-requisitos](#pré-requisitos)
   - [Arquitetura](#arquitetura)
+  - [Screenshots](#screenshots)
   - [Como Rodar](#como-rodar)
     - [Executando com o comando make](#executando-com-o-comando-make)
     - [Executando sem o comando make](#executando-sem-o-comando-make)
@@ -127,6 +128,26 @@ graph TB
 - **Email Service** (Mailpit) — captura os e-mails transacionais em uma UI local para desenvolvimento.
 
 O diagrama de arquitetura completo (C4) está em [docs/diagrams/software-arch.mermaid](docs/diagrams/software-arch.mermaid).
+
+## Screenshots
+
+**Página inicial — tema escuro**
+![Página inicial em tema escuro com grid de vídeos e filtro por categorias](images/a.png)
+
+**Página inicial — tema claro**
+![Página inicial em tema claro com grid de vídeos e filtro por categorias](images/b.png)
+
+**Player de vídeo**
+![Player de vídeo com informações do canal, likes e seção de comentários](images/c.png)
+
+**Studio — gerenciamento de vídeos**
+![Painel studio listando vídeos com status, visualizações e ações de edição](images/d.png)
+
+**Upload de vídeo**
+![Formulário de upload com campos de título, categoria e seleção de arquivo](images/e.png)
+
+**Resultados de busca**
+![Página de resultados de busca exibindo vídeos encontrados](images/f.png)
 
 ## Como Rodar
 

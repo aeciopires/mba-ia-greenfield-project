@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -18,12 +18,32 @@ function toSlug(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
+const DEFAULT_CATEGORIES = [
+  { name: 'Education', slug: 'education' },
+  { name: 'Entertainment', slug: 'entertainment' },
+  { name: 'Gaming', slug: 'gaming' },
+  { name: 'Music', slug: 'music' },
+  { name: 'News & Politics', slug: 'news-politics' },
+  { name: 'Science & Technology', slug: 'science-technology' },
+  { name: 'Sports', slug: 'sports' },
+  { name: 'Travel & Events', slug: 'travel-events' },
+];
+
 @Injectable()
-export class CategoriesService {
+export class CategoriesService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
   ) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    const count = await this.categoryRepository.count();
+    if (count === 0) {
+      for (const data of DEFAULT_CATEGORIES) {
+        await this.categoryRepository.save(this.categoryRepository.create(data));
+      }
+    }
+  }
 
   async findAll(): Promise<Category[]> {
     return this.categoryRepository.find({ order: { name: 'ASC' } });

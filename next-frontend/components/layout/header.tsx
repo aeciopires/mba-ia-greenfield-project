@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { StreamTubeIcon } from "@/components/icons/streamtube-icon";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SessionContext } from "@/components/auth/session-provider";
@@ -56,6 +57,8 @@ export function Header({ className }: { className?: string }) {
       </form>
 
       <nav className="flex shrink-0 items-center gap-2">
+        <ThemeToggle />
+
         {session.isLoggedIn ? (
           <>
             <Link href="/studio/videos">

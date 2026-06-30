@@ -5,6 +5,9 @@
 @source not "../CLAUDE.md";
 @source not "../../CLAUDE.md";
 
+/* Class-based dark mode: dark: utilities activate when .dark is on an ancestor */
+@custom-variant dark (&:is(.dark *));
+
 :root {
   /* base */
   --background: #ffffff;
@@ -38,7 +41,7 @@
   --success-text: #15803d;
   --input-background: #e3e3e3;
   --destructive-text: #d00416;
-  --sidebar: #ffffff;
+  --sidebar: #f2f2f2;
   --sidebar-foreground: #0f0f0f;
   --sidebar-primary: #0f0f0f;
   --sidebar-primary-foreground: #ffffff;
@@ -258,8 +261,56 @@
   --color-popover: var(--popover);
 }
 
+/* Dark mode via class (set by ThemeProvider before first paint) */
+html.dark {
+  --background: #0f0f0f;
+  --foreground: #ffffff;
+  --card: #282828;
+  --card-foreground: #ffffff;
+  --popover: #282828;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #0f0f0f;
+  --secondary: #282828;
+  --secondary-foreground: #ffffff;
+  --muted: #3d3d3d;
+  --muted-foreground: #aaaaaa;
+  --accent: #3d3d3d;
+  --accent-foreground: #ffffff;
+  --destructive: #fb3748;
+  --destructive-foreground: #ffffff;
+  --success: #84ebb4;
+  --success-foreground: #0f0f0f;
+  --warning: #ffdb43;
+  --warning-foreground: #0f0f0f;
+  --border: #3d3d3d;
+  --input: #3d3d3d;
+  --ring: #3ea6ff;
+  --link: #3ea6ff;
+  --warning-text: #ffdb43;
+  --overlay: #00000080;
+  --success-text: #84ebb4;
+  --input-background: #282828;
+  --destructive-text: #fb3748;
+  --sidebar: #212121;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #0f0f0f;
+  --sidebar-accent: #3d3d3d;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #3d3d3d;
+  --sidebar-ring: #3ea6ff;
+  --chart-1: #ffaaaa;
+  --chart-2: #ff5555;
+  --chart-3: #ff2a2a;
+  --chart-4: #ff0000;
+  --chart-5: #d90000;
+  --progress-track: #ffffff;
+}
+
+/* Fallback: respect system preference when no explicit class is set */
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not(.light):not(.dark) {
     --background: #0f0f0f;
     --foreground: #ffffff;
     --card: #282828;
@@ -287,9 +338,9 @@
     --warning-text: #ffdb43;
     --overlay: #00000080;
     --success-text: #84ebb4;
-    --input-background: #0f0f0f;
+    --input-background: #282828;
     --destructive-text: #fb3748;
-    --sidebar: #282828;
+    --sidebar: #212121;
     --sidebar-foreground: #ffffff;
     --sidebar-primary: #ffffff;
     --sidebar-primary-foreground: #0f0f0f;
