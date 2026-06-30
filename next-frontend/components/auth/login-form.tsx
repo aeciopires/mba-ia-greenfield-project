@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -26,7 +26,6 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>
 
 function LoginForm({ className, ...props }: React.ComponentProps<"form">) {
-  const router = useRouter()
   const {
     register,
     handleSubmit,
@@ -51,9 +50,10 @@ function LoginForm({ className, ...props }: React.ComponentProps<"form">) {
     }
 
     // On 200 the BFF has already sealed the iron-session cookie (tokens never
-    // cross to the browser, per TD-02). Refresh so server chrome reflects the
-    // authenticated session (per phase-02-auth-frontend/TD-06).
-    router.refresh()
+    // cross to the browser, per TD-02). Hard-navigate to home so the root
+    // layout re-renders on the server and SessionProvider receives the new
+    // authenticated session (router.push alone skips layout re-render).
+    window.location.href = "/"
   }
 
   return (

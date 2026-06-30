@@ -92,7 +92,7 @@ export class AuthService {
       throw new InvalidCredentialsException();
     }
 
-    if (!user.is_confirmed) {
+    if (this.authCfg.requireEmailConfirmation && !user.is_confirmed) {
       throw new EmailNotConfirmedException();
     }
 

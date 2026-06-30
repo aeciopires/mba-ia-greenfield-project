@@ -28,7 +28,7 @@ export default function StudioVideoEditPage() {
   useEffect(() => {
     async function load() {
       const [vRes, cRes] = await Promise.all([
-        fetch(`/api/videos/${id}`),
+        fetch(`/api/studio/videos/${id}`),
         fetch("/api/categories"),
       ]);
       if (!vRes.ok) { router.push("/studio/videos"); return; }

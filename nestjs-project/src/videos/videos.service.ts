@@ -211,6 +211,17 @@ export class VideosService {
     return { data, total };
   }
 
+  async findByIdForStudio(videoId: string, channelId: string): Promise<Video> {
+    const video = await this.videoRepository.findOne({
+      where: { id: videoId },
+      relations: ['category'],
+    });
+    if (!video || video.channel_id !== channelId) {
+      throw new VideoNotFoundException();
+    }
+    return video;
+  }
+
   async findBySlug(slug: string): Promise<Video> {
     const video = await this.videoRepository.findOne({
       where: { slug, status: VideoStatus.READY },

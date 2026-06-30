@@ -28,7 +28,10 @@ install:
 
 up:
 	docker compose -f nestjs-project/compose.yaml up -d
+	$(NESTJS) npm run migration:run
+	docker compose -f nestjs-project/compose.yaml exec -d nestjs-api npm run start:dev
 	docker compose -f next-frontend/compose.yaml up -d
+	docker compose -f next-frontend/compose.yaml exec -d next-frontend npm run dev
 
 down:
 	docker compose -f nestjs-project/compose.yaml down

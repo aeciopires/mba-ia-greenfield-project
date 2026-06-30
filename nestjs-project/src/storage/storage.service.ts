@@ -15,12 +15,27 @@ import { S3_CLIENT } from './storage.constants';
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
+  // AWS Sig V4 binds the Host header into the signature. Using the internal
+  // s3Client (minio:9000) for presigning produces URLs that browsers reject
+  // with 403 when they hit localhost:9000. This client signs for the public
+  // endpoint so the browser's Host header matches the signature.
+  private readonly presignClient: S3Client;
 
   constructor(
     @Inject(S3_CLIENT) private readonly s3Client: S3Client,
     @Inject(storageConfig.KEY)
     private readonly config: ConfigType<typeof storageConfig>,
-  ) {}
+  ) {
+    this.presignClient = new S3Client({
+      endpoint: config.publicEndpoint,
+      region: 'us-east-1',
+      credentials: {
+        accessKeyId: config.accessKey,
+        secretAccessKey: config.secretKey,
+      },
+      forcePathStyle: true,
+    });
+  }
 
   async onModuleInit(): Promise<void> {
     await this.ensureBucketExists();
@@ -55,7 +70,7 @@ export class StorageService implements OnModuleInit {
       Key: key,
       ContentType: contentType,
     });
-    return getSignedUrl(this.s3Client, command, {
+    return getSignedUrl(this.presignClient, command, {
       expiresIn: expiresIn ?? this.config.presignedUrlExpiresIn,
     });
   }
@@ -72,7 +87,7 @@ export class StorageService implements OnModuleInit {
         ? { ResponseContentDisposition: contentDisposition }
         : {}),
     });
-    return getSignedUrl(this.s3Client, command, {
+    return getSignedUrl(this.presignClient, command, {
       expiresIn: expiresIn ?? 3600,
     });
   }

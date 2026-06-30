@@ -242,6 +242,37 @@ export class VideosController {
     return this.videosService.getSuggestions(slug);
   }
 
+  @Get(':id/studio')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Get own video for studio editing',
+    description:
+      'Returns a video in any status (draft, processing, ready, error) owned by the authenticated user. Used by the studio edit page.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Video details',
+    schema: { type: 'object' },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async getVideoForStudio(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    const channel = await this.channelsService.findByUserId(user.sub);
+    if (!channel) throw new NotFoundException('Channel not found for user');
+    return this.videosService.findByIdForStudio(id, channel.id);
+  }
+
   @Public()
   @Get(':slug')
   @ApiOperation({

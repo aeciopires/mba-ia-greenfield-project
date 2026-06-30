@@ -29,6 +29,7 @@ const mockAuthConfig = {
   jwtRefreshExpiration: '7d',
   confirmationTokenExpirationHours: 1,
   passwordResetTokenExpirationHours: 1,
+  requireEmailConfirmation: true,
 };
 
 describe('AuthService — register', () => {
@@ -480,6 +481,61 @@ describe('AuthService — login', () => {
     expect(typeof result.access_token).toBe('string');
     expect(typeof result.refresh_token).toBe('string');
     expect(refreshTokenRepository.save).toHaveBeenCalled();
+  });
+
+  it('allows login for unconfirmed user when requireEmailConfirmation is false', async () => {
+    const module = await Test.createTestingModule({
+      imports: [
+        JwtModule.register({
+          secret: 'test-secret',
+          signOptions: { expiresIn: '15m' },
+        }),
+      ],
+      providers: [
+        AuthService,
+        {
+          provide: UsersService,
+          useValue: { findByEmail: jest.fn() },
+        },
+        {
+          provide: MailService,
+          useValue: {},
+        },
+        {
+          provide: getRepositoryToken(VerificationToken),
+          useValue: {},
+        },
+        {
+          provide: getRepositoryToken(RefreshToken),
+          useValue: {
+            create: jest.fn().mockReturnValue({}),
+            save: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: authConfig.KEY,
+          useValue: { ...mockAuthConfig, requireEmailConfirmation: false },
+        },
+      ],
+    }).compile();
+
+    const svcNoConfirm = module.get(AuthService);
+    const usSvcNoConfirm = module.get<jest.Mocked<UsersService>>(UsersService);
+
+    usSvcNoConfirm.findByEmail.mockResolvedValue({
+      id: 'u1',
+      email: 'user@example.com',
+      password: hashedTestPassword,
+      is_confirmed: false,
+    } as any);
+
+    const result = await svcNoConfirm.login({
+      email: 'user@example.com',
+      password: 'correctpassword',
+    });
+
+    expect(result.access_token).toBeDefined();
+    expect(result.refresh_token).toBeDefined();
   });
 });
 

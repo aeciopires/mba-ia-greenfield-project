@@ -5,7 +5,9 @@ jest.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: jest.fn(),
 }));
 
-const PRESIGNED_URL = 'https://minio.example.com/signed';
+// Represents the URL the presign client (configured with publicEndpoint) generates.
+const PRESIGNED_URL =
+  'http://localhost:9000/streamtube/channels/c1/videos/v1/original.mp4?X-Amz-Signature=abc';
 
 const DEFAULT_CONFIG = {
   endpoint: 'minio',
@@ -36,12 +38,16 @@ describe('StorageService', () => {
   });
 
   describe('generateUploadPresignedUrl', () => {
-    it('returns a presigned URL using config default expiry', async () => {
+    it('returns the presigned URL from the public-endpoint client', async () => {
       const url = await service.generateUploadPresignedUrl(
         'key/video.mp4',
         'video/mp4',
       );
       expect(url).toBe(PRESIGNED_URL);
+    });
+
+    it('uses config default expiry', async () => {
+      await service.generateUploadPresignedUrl('key/video.mp4', 'video/mp4');
       expect(getSignedUrl).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(Object),
@@ -50,11 +56,7 @@ describe('StorageService', () => {
     });
 
     it('uses provided expiresIn instead of config default', async () => {
-      await service.generateUploadPresignedUrl(
-        'key/video.mp4',
-        'video/mp4',
-        3600,
-      );
+      await service.generateUploadPresignedUrl('key/video.mp4', 'video/mp4', 3600);
       expect(getSignedUrl).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(Object),
@@ -64,7 +66,7 @@ describe('StorageService', () => {
   });
 
   describe('generateDownloadPresignedUrl', () => {
-    it('returns a presigned GET URL', async () => {
+    it('returns the presigned URL from the public-endpoint client', async () => {
       const url = await service.generateDownloadPresignedUrl('key/video.mp4');
       expect(url).toBe(PRESIGNED_URL);
       expect(getSignedUrl).toHaveBeenCalledTimes(1);

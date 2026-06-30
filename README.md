@@ -7,15 +7,16 @@
   - [Pré-requisitos](#pré-requisitos)
   - [Arquitetura](#arquitetura)
   - [Como Rodar](#como-rodar)
-    - [1. Backend (NestJS + PostgreSQL + MinIO + Redis + Mailpit)](#1-backend-nestjs--postgresql--minio--redis--mailpit)
-    - [2. Frontend (Next.js)](#2-frontend-nextjs)
+    - [Executando com o comando make](#executando-com-o-comando-make)
+    - [Executando sem o comando make](#executando-sem-o-comando-make)
+      - [1. Backend (NestJS + PostgreSQL + MinIO + Redis + Mailpit)](#1-backend-nestjs--postgresql--minio--redis--mailpit)
+      - [2. Frontend (Next.js)](#2-frontend-nextjs)
   - [Fluxo de Upload de Vídeo](#fluxo-de-upload-de-vídeo)
   - [Fluxo de Autenticação](#fluxo-de-autenticação)
-  - [Makefile — Atalhos de Desenvolvimento](#makefile--atalhos-de-desenvolvimento)
   - [Testes](#testes)
     - [Backend (Jest)](#backend-jest)
     - [Frontend (Vitest + Playwright)](#frontend-vitest--playwright)
-  - [Tutorial de Uso](#tutorial-de-uso)
+  - [Tutorial de Uso via API](#tutorial-de-uso-via-api)
     - [1. Criar conta](#1-criar-conta)
     - [2. Confirmar e-mail](#2-confirmar-e-mail)
     - [3. Fazer login e salvar o token](#3-fazer-login-e-salvar-o-token)
@@ -122,11 +123,50 @@ O diagrama de arquitetura completo (C4) está em [docs/diagrams/software-arch.me
 
 ## Como Rodar
 
-> **Atalho:** use `make help` para ver todos os comandos disponíveis via Makefile na raiz do projeto.
+### Executando com o comando make
+
+> **INFO:** use `make help` para ver todos os comandos disponíveis via ``Makefile`` na raiz do projeto.
+
+Configure os arquivos de variáveis de ambiente.
+
+```bash
+# Copie as variáveis de ambiente e ajuste conforme a necessidade
+cp nestjs-project/.env.example nestjs-project/.env
+
+# Copie as variáveis de ambiente
+cp next-frontend/.env.example next-frontend/.env.local
+```
+
+> **Confirmação de e-mail (desenvolvimento):** o arquivo `.env.example` do backend define `REQUIRE_EMAIL_CONFIRMATION=true`, que é o padrão seguro para produção. Em desenvolvimento, o `.env` já vem com `REQUIRE_EMAIL_CONFIRMATION=false` para permitir login imediatamente após o cadastro, sem precisar confirmar o e-mail. Altere para `true` sempre que quiser testar o fluxo completo de confirmação.
+
+O arquivo `Makefile` na raiz do projeto oferece atalhos para as tarefas mais comuns:
+
+```bash
+make help            # lista todos os comandos disponíveis
+
+make up              # sobe todos os containers (backend + frontend)
+make down            # derruba todos os containers
+make install         # instala dependências em todos os containers
+
+make test            # roda todos os testes (backend + E2E + frontend)
+make test-backend    # testes unitários e de integração do NestJS
+make test-e2e        # testes E2E do NestJS (supertest)
+make test-frontend   # testes Vitest do Next.js
+
+make lint            # lint em ambos os subprojetos
+make typecheck       # type-check TypeScript em ambos
+
+make migrate         # executa migrações pendentes do banco
+make seed            # insere dados de exemplo no banco
+```
+
+Veja os links de acesso a aplicação na seção a seguir.
+
+### Executando sem o comando make
 
 Os dois subprojetos têm stacks Docker **separadas**. O backend deve estar rodando antes do frontend.
 
-### 1. Backend (NestJS + PostgreSQL + MinIO + Redis + Mailpit)
+#### 1. Backend (NestJS + PostgreSQL + MinIO + Redis + Mailpit)
 
 ```bash
 cd nestjs-project
@@ -163,7 +203,7 @@ Serviços disponíveis após o boot:
 | Redis | `localhost:6379` | — |
 | Mailpit (UI de e-mails) | http://localhost:8025 | — |
 
-### 2. Frontend (Next.js)
+#### 2. Frontend (Next.js)
 
 ```bash
 cd next-frontend
@@ -257,29 +297,6 @@ sequenceDiagram
     A-->>U: Novo par { access_token, refresh_token }
 ```
 
-## Makefile — Atalhos de Desenvolvimento
-
-O arquivo `Makefile` na raiz do projeto oferece atalhos para as tarefas mais comuns:
-
-```bash
-make help            # lista todos os comandos disponíveis
-
-make up              # sobe todos os containers (backend + frontend)
-make down            # derruba todos os containers
-make install         # instala dependências em todos os containers
-
-make test            # roda todos os testes (backend + E2E + frontend)
-make test-backend    # testes unitários e de integração do NestJS
-make test-e2e        # testes E2E do NestJS (supertest)
-make test-frontend   # testes Vitest do Next.js
-
-make lint            # lint em ambos os subprojetos
-make typecheck       # type-check TypeScript em ambos
-
-make migrate         # executa migrações pendentes do banco
-make seed            # insere dados de exemplo no banco
-```
-
 ## Testes
 
 ### Backend (Jest)
@@ -330,7 +347,7 @@ npx playwright test
 
 Sufixos: `*.test.ts(x)` (unitário), `*.integration.test.ts(x)` (Route Handlers com MSW), `*.e2e-spec.ts` (Playwright). MSW intercepta chamadas à API NestJS — os testes nunca batem no backend real.
 
-## Tutorial de Uso
+## Tutorial de Uso via API
 
 Passo a passo para usar a plataforma com a API em execução. Use o **Swagger** em http://localhost:3000/api-docs ou `curl` conforme preferir.
 

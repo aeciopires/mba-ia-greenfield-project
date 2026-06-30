@@ -31,6 +31,44 @@ export class ChannelsController {
     private readonly videosService: VideosService,
   ) {}
 
+  @Get('me')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Get own channel',
+    description: "Returns the authenticated user's channel.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Channel details',
+    schema: {
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        name: { type: 'string' },
+        nickname: { type: 'string' },
+        description: { type: 'string', nullable: true },
+        user_id: { type: 'string', format: 'uuid' },
+        subscribers_count: { type: 'number' },
+        created_at: { type: 'string', format: 'date-time' },
+        updated_at: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Channel not found',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async getMyChannel(@CurrentUser() user: JwtPayload) {
+    const channel = await this.channelsService.findByUserId(user.sub);
+    if (!channel) throw new NotFoundException('Channel not found');
+    return channel;
+  }
+
   @Public()
   @Get(':nickname')
   @ApiOperation({

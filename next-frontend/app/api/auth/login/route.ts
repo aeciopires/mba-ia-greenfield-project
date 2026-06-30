@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import type { LoginDto, LoginTokenPair, ApiErrorEnvelope } from "@/lib/api/contracts";
+import type { LoginDto, LoginTokenPair, MyChannel, ApiErrorEnvelope } from "@/lib/api/contracts";
 import { upstream } from "@/lib/api/upstream";
 import { setSession } from "@/lib/auth/session";
 
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const { data, error, response } = await upstream.POST("/auth/login", {
     body: body as never,
   });
-  console.log(error, data, response);
+
   if (error) {
     return NextResponse.json<ApiErrorEnvelope>(error as ApiErrorEnvelope, {
       status: response.status,
@@ -18,16 +18,35 @@ export async function POST(request: Request) {
   }
 
   const tokens = data as LoginTokenPair;
+  const accessToken = tokens.access_token ?? "";
+  const refreshToken = tokens.refresh_token ?? "";
 
-  // Seal tokens into the iron-session cookie — tokens never cross to the browser.
+  // Decode the JWT payload (no verification needed — we just received it from
+  // the auth server). Extract the subject claim (userId).
+  let userId = "";
+  try {
+    const [, payloadB64] = accessToken.split(".");
+    const payload = JSON.parse(
+      Buffer.from(payloadB64, "base64url").toString("utf-8"),
+    ) as { sub?: string };
+    userId = payload.sub ?? "";
+  } catch {
+    // leave userId empty if the token is malformed
+  }
+
+  // Fetch the user's own channel to populate channelSlug in the session.
+  const { data: channelData } = await upstream.GET("/channels/me", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const channel = channelData as MyChannel | undefined;
+
   await setSession({
-    accessToken: tokens.access_token ?? "",
-    refreshToken: tokens.refresh_token ?? "",
-    userId: "",
+    accessToken,
+    refreshToken,
+    userId,
     email: (body as Record<string, string>).email ?? "",
-    channelSlug: "",
+    channelSlug: channel?.nickname ?? "",
   });
 
-  // FE-facing body omits access_token / refresh_token (per API Contract).
   return NextResponse.json({}, { status: 200 });
 }

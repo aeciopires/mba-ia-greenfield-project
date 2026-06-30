@@ -46,6 +46,9 @@ export interface Category {
 
 // ─── Channels ─────────────────────────────────────────────────────────────────
 
+export type MyChannel =
+  paths["/channels/me"]["get"]["responses"][200]["content"]["application/json"];
+
 export interface Channel {
   id: string;
   name: string;
