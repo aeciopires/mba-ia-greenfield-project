@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { CreateVideoDto, InitiateUploadResponse, Video } from "@/lib/api/contracts";
+import type { Category, CreateVideoDto, InitiateUploadResponse, UpdateVideoDto, Video } from "@/lib/api/contracts";
 
 type UploadStep = "idle" | "creating" | "uploading" | "processing" | "done" | "error";
 
@@ -17,9 +17,18 @@ export default function StudioVideoUploadPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState<Category[]>([]);
   const [step, setStep] = useState<UploadStep>("idle");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setCategories(data as Category[]))
+      .catch(() => {/* show empty list */});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +55,15 @@ export default function StudioVideoUploadPage() {
     }
 
     const { video, presigned_upload_url } = (await createRes.json()) as InitiateUploadResponse;
+
+    // 1b. Set category if selected (separate PATCH since CreateVideoDto has no category_id)
+    if (categoryId) {
+      await fetch(`/api/videos/${video.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category_id: categoryId } satisfies UpdateVideoDto),
+      });
+    }
 
     // 2. Upload file directly to object storage via presigned URL
     setStep("uploading");
@@ -105,6 +123,23 @@ export default function StudioVideoUploadPage() {
               required
             />
           </div>
+
+          {categories.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="category">Category</Label>
+              <select
+                id="category"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full rounded-[var(--radius-1)] border border-input bg-input-background px-3 py-2 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">No category</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="file">Video file</Label>

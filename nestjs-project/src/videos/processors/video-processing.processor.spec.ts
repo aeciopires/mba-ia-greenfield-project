@@ -33,7 +33,7 @@ function makeRepo(): any {
 
 function makeStorageService(): any {
   return {
-    generateDownloadPresignedUrl: jest.fn().mockResolvedValue(PRESIGNED_URL),
+    generateInternalDownloadPresignedUrl: jest.fn().mockResolvedValue(PRESIGNED_URL),
     putObject: jest.fn().mockResolvedValue(undefined),
   };
 }

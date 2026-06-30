@@ -92,6 +92,22 @@ export class StorageService implements OnModuleInit {
     });
   }
 
+  // For server-side consumers (e.g. the video-worker) that run inside the
+  // Docker network: signs with s3Client (endpoint minio:9000) so the
+  // resulting URL resolves correctly inside the container.
+  async generateInternalDownloadPresignedUrl(
+    key: string,
+    expiresIn?: number,
+  ): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.config.bucket,
+      Key: key,
+    });
+    return getSignedUrl(this.s3Client, command, {
+      expiresIn: expiresIn ?? 3600,
+    });
+  }
+
   async putObject(
     key: string,
     body: Buffer,

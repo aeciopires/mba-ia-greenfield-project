@@ -24,8 +24,15 @@
     - [5. Fazer upload diretamente para o MinIO](#5-fazer-upload-diretamente-para-o-minio)
     - [6. Iniciar processamento](#6-iniciar-processamento)
     - [7. Consultar vídeo processado](#7-consultar-vídeo-processado)
-    - [8. Assistir / Baixar](#8-assistir--baixar)
-    - [9. Remover vídeo](#9-remover-vídeo)
+    - [8. Publicar vídeo](#8-publicar-vídeo)
+    - [9. Atualizar título do vídeo](#9-atualizar-título-do-vídeo)
+    - [10. Assistir / Baixar](#10-assistir--baixar)
+    - [11. Incrementar visualizações](#11-incrementar-visualizações)
+    - [12. Listar e cadastrar categorias](#12-listar-e-cadastrar-categorias)
+    - [13. Comentários](#13-comentários)
+    - [14. Likes e dislikes do vídeo](#14-likes-e-dislikes-do-vídeo)
+    - [15. Inscrições em canal](#15-inscrições-em-canal)
+    - [16. Remover vídeo](#16-remover-vídeo)
   - [Funcionalidades Implementadas](#funcionalidades-implementadas)
     - [Fase 01 — Configuração Base](#fase-01--configuração-base)
     - [Fase 02 — Autenticação](#fase-02--autenticação)
@@ -428,7 +435,26 @@ curl -s "http://localhost:3000/videos/$SLUG" | jq .
 # status="ready", duration preenchido, thumbnail_key disponível
 ```
 
-### 8. Assistir / Baixar
+### 8. Publicar vídeo
+
+Após o processamento o vídeo fica com status `ready`. Para aparecer nos resultados públicos de listagem e busca, ele precisa ser publicado.
+
+```bash
+curl -s -X PATCH "http://localhost:3000/videos/$VIDEO_ID/publish" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+# Resposta: { published_at: "2024-...", visibility: "public", ... }
+```
+
+### 9. Atualizar título do vídeo
+
+```bash
+curl -s -X PATCH "http://localhost:3000/videos/$VIDEO_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Meu Vídeo Atualizado","description":"Nova descrição do vídeo"}' | jq .
+```
+
+### 10. Assistir / Baixar
 
 ```bash
 # Streaming: 302 → URL MinIO com suporte a Range requests
@@ -437,9 +463,116 @@ curl -s -I "http://localhost:3000/videos/$SLUG/stream"
 
 # Download com content-disposition: attachment
 curl -s -I "http://localhost:3000/videos/$SLUG/download"
+
+# Thumbnail (redireciona para a imagem gerada pelo FFmpeg)
+curl -s -I "http://localhost:3000/videos/$SLUG/thumbnail"
 ```
 
-### 9. Remover vídeo
+### 11. Incrementar visualizações
+
+Chamado automaticamente pelo player ao montar na página `/watch/{slug}`. Também pode ser acionado diretamente:
+
+```bash
+curl -s -X POST "http://localhost:3000/videos/$SLUG/views" | jq .
+# { view_count: 1 }
+
+# Verificar contador atualizado
+curl -s "http://localhost:3000/videos/$SLUG" | jq '.view_count'
+```
+
+### 12. Listar e cadastrar categorias
+
+```bash
+# Listar todas as categorias disponíveis
+CATEGORIES=$(curl -s "http://localhost:3000/categories")
+echo $CATEGORIES | jq .
+
+# Salvar o ID de uma categoria
+CATEGORY_ID=$(echo $CATEGORIES | jq -r '.[0].id')
+echo "Category ID: $CATEGORY_ID"
+
+# Atribuir categoria ao vídeo
+curl -s -X PATCH "http://localhost:3000/videos/$VIDEO_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"category_id\":\"$CATEGORY_ID\"}" | jq .
+
+# Listar vídeos filtrados por categoria
+curl -s "http://localhost:3000/videos?category_id=$CATEGORY_ID" | jq .
+```
+
+### 13. Comentários
+
+```bash
+# Listar comentários paginados do vídeo (públic, sem autenticação)
+curl -s "http://localhost:3000/videos/$SLUG/comments" | jq .
+
+# Criar comentário
+COMMENT=$(curl -s -X POST "http://localhost:3000/videos/$SLUG/comments" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Ótimo vídeo!"}')
+echo $COMMENT | jq .
+COMMENT_ID=$(echo $COMMENT | jq -r '.id')
+
+# Responder a um comentário (max depth 1)
+curl -s -X POST "http://localhost:3000/comments/$COMMENT_ID/replies" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Obrigado pelo comentário!"}' | jq .
+
+# Deletar próprio comentário
+curl -s -X DELETE "http://localhost:3000/comments/$COMMENT_ID" \
+  -H "Authorization: Bearer $TOKEN"
+# 204 No Content
+```
+
+### 14. Likes e dislikes do vídeo
+
+```bash
+# Dar like no vídeo
+curl -s -X POST "http://localhost:3000/videos/$SLUG/likes" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"like"}' | jq .
+
+# Mudar para dislike (chamar novamente com "dislike" — toggle se mesmo tipo)
+curl -s -X POST "http://localhost:3000/videos/$SLUG/likes" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"dislike"}' | jq .
+
+# Remover voto
+curl -s -X DELETE "http://localhost:3000/videos/$SLUG/likes" \
+  -H "Authorization: Bearer $TOKEN"
+# 204 No Content
+
+# Ver contadores atuais no detalhe do vídeo
+curl -s "http://localhost:3000/videos/$SLUG" | jq '{like_count, dislike_count}'
+```
+
+### 15. Inscrições em canal
+
+O nickname do canal é derivado do prefixo do e-mail de cadastro (ex.: `voce@example.com` → `voce`). Ajuste conforme o canal desejado.
+
+```bash
+CHANNEL_NICKNAME="voce"   # substitua pelo nickname do canal alvo
+
+# Inscrever-se em um canal
+curl -s -X POST "http://localhost:3000/channels/$CHANNEL_NICKNAME/subscriptions" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Listar canais em que o usuário está inscrito
+curl -s "http://localhost:3000/users/me/subscriptions" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Cancelar inscrição
+curl -s -X DELETE "http://localhost:3000/channels/$CHANNEL_NICKNAME/subscriptions" \
+  -H "Authorization: Bearer $TOKEN"
+# 204 No Content
+```
+
+### 16. Remover vídeo
 
 ```bash
 curl -s -X DELETE "http://localhost:3000/videos/$VIDEO_ID" \
@@ -493,15 +626,20 @@ Ciclo de vida do vídeo: `draft → processing → ready | error`.
 
 ### Fase 04 — Gerenciamento de Vídeos e Canal
 
-Categorias de vídeo, edição, visibilidade, thumbnail customizada, publicação, e páginas públicas de canal.
+Categorias de vídeo, edição, visibilidade, thumbnail customizada, publicação, páginas públicas de canal e gerenciamento de categorias.
 
 | Método & Rota | Auth | Descrição |
 |---------------|------|-----------|
 | `GET /categories` | Público | Lista categorias disponíveis |
+| `POST /categories` | Bearer JWT | Cria categoria (slug auto-gerado a partir do nome) |
+| `GET /categories/:id` | Público | Retorna categoria por id |
+| `PATCH /categories/:id` | Bearer JWT | Atualiza nome e slug da categoria |
+| `DELETE /categories/:id` | Bearer JWT | Remove categoria; vídeos ficam sem categoria (FK SET NULL) |
 | `PATCH /videos/:id` | Bearer JWT | Editar título, descrição, categoria e visibilidade |
 | `POST /videos/:id/thumbnail` | Bearer JWT | Presigned URL para upload de thumbnail customizada |
+| `GET /videos/:slug/thumbnail` | Público | Redireciona 302 para URL presigned da thumbnail |
 | `PATCH /videos/:id/publish` | Bearer JWT | Publicar vídeo (transita para status `ready`) |
-| `GET /videos` | Público | Filtragem por `category_id`; somente vídeos públicos e prontos |
+| `GET /videos` | Público | Filtragem por `category_id` e `channel_id`; somente vídeos públicos e prontos |
 | `GET /channels/:nickname` | Público | Página pública do canal com estatísticas |
 | `GET /channels/:nickname/videos` | Público | Vídeos publicados do canal |
 | `PATCH /channels/:nickname` | Bearer JWT | Editar nome e descrição do próprio canal |
@@ -609,10 +747,11 @@ mba-ia-greenfield-project/
 │   │   ├── watch/[slug]/                 # Página de assistir (Fase 05)
 │   │   ├── channel/[nickname]/           # Página pública do canal (Fase 04)
 │   │   ├── studio/videos/                # Gerenciamento de vídeos (Fase 04)
+│   │   ├── studio/categories/            # CRUD de categorias (list, new, [id])
 │   │   ├── search/                       # Resultados de busca (Fase 07)
 │   │   ├── subscriptions/                # Canais seguidos (Fase 06)
 │   │   └── api/                          # Route Handlers BFF — proxy → API NestJS
-│   ├── components/                       # auth, video, social, home, layout, ui (shadcn)
+│   ├── components/                       # auth, categories, video, social, home, layout, ui (shadcn)
 │   ├── lib/                              # env, api (openapi-fetch), auth/session
 │   ├── mocks/                            # MSW handlers + server (testes sem backend real)
 │   ├── hooks/                            # React hooks compartilhados

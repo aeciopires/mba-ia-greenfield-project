@@ -217,8 +217,32 @@ describe('VideosService', () => {
       ).rejects.toBeInstanceOf(VideoNotFoundException);
     });
 
+    it('retries from ERROR state: resets error_message and enqueues a new job', async () => {
+      const video = makeVideo({ status: VideoStatus.ERROR, error_message: 'ffprobe failed' });
+      repo.findOne.mockResolvedValue(video);
+      repo.save.mockResolvedValue({ ...video, status: VideoStatus.PROCESSING, error_message: null });
+
+      const result = await service.startProcessing('video-uuid', 'channel-uuid');
+
+      expect(result.status).toBe(VideoStatus.PROCESSING);
+      expect(result.error_message).toBeNull();
+      expect(queue.add).toHaveBeenCalledWith(
+        VIDEO_PROCESSING_QUEUE,
+        expect.objectContaining({ videoId: 'video-uuid' }),
+        expect.objectContaining({ attempts: 3 }),
+      );
+    });
+
     it('throws VideoNotInDraftStatusException when video is already processing', async () => {
       const video = makeVideo({ status: VideoStatus.PROCESSING });
+      repo.findOne.mockResolvedValue(video);
+      await expect(
+        service.startProcessing('video-uuid', 'channel-uuid'),
+      ).rejects.toBeInstanceOf(VideoNotInDraftStatusException);
+    });
+
+    it('throws VideoNotInDraftStatusException when video is already ready', async () => {
+      const video = makeVideo({ status: VideoStatus.READY });
       repo.findOne.mockResolvedValue(video);
       await expect(
         service.startProcessing('video-uuid', 'channel-uuid'),

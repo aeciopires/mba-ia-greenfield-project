@@ -14,6 +14,7 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -23,6 +24,7 @@ import { VideosService } from '../videos/videos.service';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { QueryVideosDto } from '../videos/dto/query-videos.dto';
 
+@SkipThrottle()
 @ApiTags('channels')
 @Controller('channels')
 export class ChannelsController {

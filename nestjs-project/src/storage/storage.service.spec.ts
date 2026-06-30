@@ -97,6 +97,32 @@ describe('StorageService', () => {
     });
   });
 
+  describe('generateInternalDownloadPresignedUrl', () => {
+    it('returns a presigned URL signed with the internal s3Client', async () => {
+      const url = await service.generateInternalDownloadPresignedUrl('key/video.mp4');
+      expect(url).toBe(PRESIGNED_URL);
+      expect(getSignedUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses provided expiresIn', async () => {
+      await service.generateInternalDownloadPresignedUrl('key/video.mp4', 1800);
+      expect(getSignedUrl).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(Object),
+        { expiresIn: 1800 },
+      );
+    });
+
+    it('defaults to 3600s when expiresIn is omitted', async () => {
+      await service.generateInternalDownloadPresignedUrl('key/video.mp4');
+      expect(getSignedUrl).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(Object),
+        { expiresIn: 3600 },
+      );
+    });
+  });
+
   describe('putObject', () => {
     it('sends a PutObjectCommand with the correct key and content type', async () => {
       const body = Buffer.from('thumbnail');

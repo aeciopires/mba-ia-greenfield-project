@@ -85,6 +85,20 @@ export default function StudioVideoEditPage() {
     }
   }
 
+  async function handleRetry() {
+    if (!video) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/videos/${video.id}/start-processing`, { method: "PATCH" });
+      if (!res.ok) { setError("Failed to retry processing. Please try again."); return; }
+      const updated = (await res.json()) as Video;
+      setVideo(updated);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -159,6 +173,12 @@ export default function StudioVideoEditPage() {
 
         {error && <p className="text-caption text-destructive">{error}</p>}
 
+        {video.status === "error" && video.error_message && (
+          <p className="rounded-[var(--radius-1)] border border-destructive/40 bg-destructive/10 px-4 py-3 text-body-md text-destructive">
+            Processing error: {video.error_message}
+          </p>
+        )}
+
         <div className="flex gap-2 pt-2">
           <Button type="submit" disabled={saving}>Save changes</Button>
           {video.status === "ready" && !video.published_at && (
@@ -169,6 +189,16 @@ export default function StudioVideoEditPage() {
               disabled={saving}
             >
               Publish
+            </Button>
+          )}
+          {video.status === "error" && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { void handleRetry(); }}
+              disabled={saving}
+            >
+              Retry processing
             </Button>
           )}
         </div>

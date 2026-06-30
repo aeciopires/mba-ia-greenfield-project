@@ -45,7 +45,7 @@ export default async function StudioVideosPage({ searchParams }: StudioVideosPag
   }
 
   return (
-    <div className="mx-auto max-w-screen-xl px-4 py-6 space-y-4">
+    <div className="mx-auto max-w-screen-xl px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-h2">My Videos</h1>
         <Link
@@ -53,6 +53,18 @@ export default async function StudioVideosPage({ searchParams }: StudioVideosPag
           className="rounded-md bg-primary px-4 py-2 text-label-md text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           Upload video
+        </Link>
+      </div>
+
+      <div className="flex items-center justify-between rounded-[var(--radius-2)] border border-border bg-muted/40 px-4 py-3">
+        <span className="text-body-md text-muted-foreground">
+          Manage the categories available for videos.
+        </span>
+        <Link
+          href="/studio/categories"
+          className="text-label-md text-link hover:underline"
+        >
+          Manage categories →
         </Link>
       </div>
 
@@ -75,7 +87,7 @@ export default async function StudioVideosPage({ searchParams }: StudioVideosPag
                 <tr key={video.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
                   <td className="px-4 py-3">
                     <Link
-                      href={`/studio/videos/${video.id}`}
+                      href={`/watch/${video.slug}`}
                       className="text-label-md hover:text-primary transition-colors line-clamp-1"
                     >
                       {video.title}

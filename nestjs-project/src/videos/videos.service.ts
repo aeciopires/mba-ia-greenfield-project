@@ -78,11 +78,15 @@ export class VideosService {
       throw new VideoNotFoundException();
     }
 
-    if (video.status !== VideoStatus.DRAFT) {
+    if (
+      video.status !== VideoStatus.DRAFT &&
+      video.status !== VideoStatus.ERROR
+    ) {
       throw new VideoNotInDraftStatusException();
     }
 
     video.status = VideoStatus.PROCESSING;
+    video.error_message = null;
     await this.videoRepository.save(video);
 
     await this.videoQueue.add(
@@ -272,6 +276,17 @@ export class VideosService {
     }
 
     return qb.getMany();
+  }
+
+  async getThumbnailUrl(slug: string): Promise<string> {
+    const video = await this.findBySlug(slug);
+    if (!video.thumbnail_key) {
+      throw new VideoNotFoundException();
+    }
+    return this.storageService.generateDownloadPresignedUrl(
+      video.thumbnail_key,
+      3600,
+    );
   }
 
   async getStreamUrl(slug: string): Promise<string> {

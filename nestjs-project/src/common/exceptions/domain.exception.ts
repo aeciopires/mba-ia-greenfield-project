@@ -83,6 +83,12 @@ export class CategoryNotFoundException extends DomainException {
   }
 }
 
+export class CategorySlugAlreadyExistsException extends DomainException {
+  constructor() {
+    super('CATEGORY_SLUG_ALREADY_EXISTS', 409, 'A category with this name already exists');
+  }
+}
+
 export class ChannelNotFoundException extends DomainException {
   constructor() {
     super('CHANNEL_NOT_FOUND', 404, 'Channel not found');

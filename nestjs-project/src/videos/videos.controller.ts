@@ -20,6 +20,7 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -30,6 +31,7 @@ import { CreateVideoDto } from './dto/create-video.dto';
 import { QueryVideosDto } from './dto/query-videos.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
 
+@SkipThrottle()
 @ApiTags('videos')
 @Controller('videos')
 export class VideosController {
@@ -304,6 +306,26 @@ export class VideosController {
   @ApiResponse({ status: 204, description: 'View count incremented' })
   async incrementViewCount(@Param('slug') slug: string): Promise<void> {
     await this.videosService.incrementViewCount(slug);
+  }
+
+  @Public()
+  @Get(':slug/thumbnail')
+  @ApiOperation({
+    summary: 'Get video thumbnail',
+    description: 'Redirects to the presigned MinIO URL for the video thumbnail image.',
+  })
+  @ApiResponse({ status: 302, description: 'Redirect to presigned thumbnail URL' })
+  @ApiResponse({
+    status: 404,
+    description: 'Video or thumbnail not found',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async getThumbnailUrl(
+    @Param('slug') slug: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const url = await this.videosService.getThumbnailUrl(slug);
+    res.redirect(302, url);
   }
 
   @Public()

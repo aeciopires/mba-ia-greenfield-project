@@ -4,6 +4,42 @@ All notable changes to StreamTube are documented here, organized by release phas
 
 ---
 
+## [Correções e Gerenciamento de Categorias] — 2026-06-30
+
+### Backend — Correções (`nestjs-project/`)
+
+- **Worker Docker networking**: `VideoProcessingProcessor` agora usa `generateInternalDownloadPresignedUrl` (signed com `s3Client` / `http://minio:9000`) ao invés de `generateDownloadPresignedUrl` (signed com endpoint público `localhost:9000`). Corrige o erro "Connection refused" que impedia o processamento de vídeos dentro do container.
+- **Retry a partir do estado `error`**: `VideosService.startProcessing` aceita transição `ERROR → PROCESSING` (antes só `DRAFT`); `error_message` é resetado para null na nova tentativa.
+- **Thumbnail GET endpoint**: adicionado `GET /videos/:slug/thumbnail` (público) que redireciona 302 para URL presigned da thumbnail no MinIO. Corrige 405 ao exibir thumbnails em `<img>` tags.
+- **Rate limiting**: adicionado `@SkipThrottle()` em `CategoriesController`, `VideosController` e `ChannelsController` — o throttle de 10 req/60s permanece apenas em `AuthController` (proteção contra brute force). Corrige erro 429 em endpoints de leitura pública.
+- **Gerenciamento de categorias** — novos endpoints no `CategoriesModule`:
+  - `POST /categories` (JWT) — cria categoria; slug auto-gerado a partir do nome
+  - `GET /categories/:id` (público) — retorna categoria por id
+  - `PATCH /categories/:id` (JWT) — atualiza nome e slug
+  - `DELETE /categories/:id` (JWT, 204) — remove categoria; vídeos que a usavam têm `category_id` zerado para null (FK `ON DELETE SET NULL`)
+  - Nova exceção de domínio: `CategorySlugAlreadyExistsException` (409)
+  - DTOs: `CreateCategoryDto`, `UpdateCategoryDto`
+  - 13 novos testes unitários em `categories.service.spec.ts`
+
+### Frontend — Correções e Novas Páginas (`next-frontend/`)
+
+- **Studio — link do título**: na listagem de vídeos do studio, o título agora aponta para `/watch/${slug}` (play) em vez da página de edição.
+- **Studio — link de categorias**: banner "Manage categories →" adicionado acima da tabela de vídeos na página de studio.
+- **Gerenciamento de categorias**:
+  - `/studio/categories` — lista de categorias com edição e remoção
+  - `/studio/categories/new` — formulário de criação
+  - `/studio/categories/[id]` — formulário de edição
+  - Componentes: `CategoryForm` (create/edit), `CategoryDeleteButton` (confirm + delete)
+  - BFF routes: `POST /api/categories`, `GET/PATCH/DELETE /api/categories/[id]`
+
+### Documentação
+
+- **README** — tutorial expandido de 9 para 16 passos: publicar vídeo, atualizar título, incrementar visualizações, listar/atribuir categorias, comentários, likes, inscrições em canal
+- **Seed de categorias** reescrito (estava vazio): 8 categorias padrão inseridas de forma idempotente por slug
+- **Correção no README**: parâmetro de filtro de vídeos por categoria era `?category=` (errado); corrigido para `?category_id=`
+
+---
+
 ## [Fases 04–07 + Correções de Testes] — 2026-06-29
 
 ### Backend — Gerenciamento de Vídeos, Canal e Social (`nestjs-project/`)

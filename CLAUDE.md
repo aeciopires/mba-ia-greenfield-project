@@ -79,7 +79,7 @@ All backend phases are implemented. Frontend phases 01–02 (auth) and the video
 | POST | `/videos/:id/thumbnail` | JWT (owner) | Return presigned PUT URL for custom thumbnail |
 | PATCH | `/videos/:id/publish` | JWT (owner) | Publish ready video (status must be `ready`) |
 | DELETE | `/videos/:id` | JWT (owner) | Delete video and storage objects |
-| GET | `/videos` | Public | List public ready videos; supports `q`, `category`, `channel`, `page`, `limit` |
+| GET | `/videos` | Public | List public ready videos; supports `q`, `category_id`, `channel_id`, `page`, `limit` |
 | GET | `/videos/:slug` | Public | Get video by unique slug |
 | POST | `/videos/:slug/views` | Public | Atomically increment view count |
 | GET | `/videos/:slug/stream` | Public | 302 redirect to presigned stream URL (Range-aware) |
@@ -91,6 +91,10 @@ All backend phases are implemented. Frontend phases 01–02 (auth) and the video
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/categories` | Public | All categories sorted by name |
+| POST | `/categories` | JWT | Create category (slug auto-generated from name) |
+| GET | `/categories/:id` | Public | Get category by id |
+| PATCH | `/categories/:id` | JWT | Update name (slug updated accordingly) |
+| DELETE | `/categories/:id` | JWT | Delete category (videos lose category, FK SET NULL) |
 
 **Social — Video Likes** (`/videos`)
 

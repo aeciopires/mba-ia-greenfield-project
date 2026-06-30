@@ -31,10 +31,11 @@ export class VideoProcessingProcessor extends WorkerHost {
     let thumbnailPath: string | null = null;
 
     try {
-      const videoUrl = await this.storageService.generateDownloadPresignedUrl(
-        storageKey,
-        3600,
-      );
+      const videoUrl =
+        await this.storageService.generateInternalDownloadPresignedUrl(
+          storageKey,
+          3600,
+        );
 
       const probeData = await this.probeVideo(videoUrl);
       const rawDuration = probeData.format.duration;
